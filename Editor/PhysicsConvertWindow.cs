@@ -232,6 +232,12 @@ namespace Neigerium.PhysicsConverter.Editor
                     GameObject.DestroyImmediate(cloneAvatar);
                     break;
                 }
+                else
+                {
+                    bakedAvatar = cloneAvatar;
+                    bakedAvatar.transform.transform.position = Vector3.zero;
+                    bakedAvatar.name = baseAvatar.name;
+                }
             }
             return bakedAvatar;
         }
