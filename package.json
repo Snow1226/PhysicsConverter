@@ -1,0 +1,17 @@
+{
+    "name": "neigerium.physicsconverter",
+    "displayName": "PhysicsConverter",
+    "version": "0.1.0",
+    "unity": "2022.3",
+    "description": "Convert VRC Physbone to MagicaCloth2 and Avatar export for VMCMod",
+    "author": {
+        "name": "Snow1226",
+        "url": "https://github.com/Snow1226/PhysicsConverter"
+    },
+    "license": "GPL-3.0 license",
+    "licenseUrl": "https://github.com/Snow1226/PhysicsConverter/blob/main/LICENSE",
+    "changelogUrl": "https://github.com/Snow1226/PhysicsConverter/CHANGELOG.md",
+    "vpmDependencies": {
+        "com.vrchat.avatars": "^3.10.1"
+    }
+}

@@ -1,0 +1,19 @@
+{
+    "name": "neigerium.physicsconverter",
+    "rootNamespace": "Neigerium",
+    "references": [
+        "GUID:406190ab8ee569c46bc05a890e5127a0",
+        "GUID:62ced99b048af7f4d8dfe4bed8373d76"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
