@@ -2,11 +2,13 @@
 VRC用にセットアップしたアバターのPhysboneをMagicaCloth2に変換し、  
 VirtualMotionCaptureで使用するためのエクスポーターです。  
   
-揺れ方は仕様の違いで完全に同じにはなりません。  
-またそのためスカートなどの貫通具合も変わります。  
+MagicaClothはPhnysboneのHinge、Polarに該当する角度制限がないため、スカートなどの貫通具合も変わります。  
+貫通が目立つ場合は手動でMeshClothを設定してください。
+
+現在は揺れ具合はPhysboneより少し柔らか目になるように変換しています。  
   
 揺れ具合ではなく明らかに向き等がおかしい場合は、  
-使用しているアバターと衣装、どの部分がおかしいか等を添えてIssueを立てていただけると検討するかもしれません。  
+使用しているアバターと衣装のBOOTH URL、どの部分がおかしいか等を添えてIssueを立てていただけると検討するかもしれません。  
   
 ### 必要なもの
 - [MagicaCloth2](https://assetstore.unity.com/packages/tools/physics/magica-cloth-2-242307)   

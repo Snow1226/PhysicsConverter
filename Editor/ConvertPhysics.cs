@@ -74,12 +74,20 @@ namespace Neigerium.PhysicsConverter.Editor
             // MagicaClothはRootBoneがBoneTaleとして回転してしまうため、RootBoneの子をRootBoneとして追加する
             //mcRootBones.Add(rootBone.transform);
 
-            //根本でignoreTransformsで分割している場合の処理を入れる
             var ignoreList = physbone.ignoreTransforms.ToList();
             foreach (Transform t in rootBone.transform)
             {
-                if(ignoreList.Contains(t)) continue;
-                mcRootBones.Add(t);
+                //根本でignoreTransformsで分割している場合はスキップ
+                if (ignoreList.Contains(t)) continue;
+
+                if(t.childCount > 0)
+                    mcRootBones.Add(t);
+                else
+                {
+                    //子がいない場合はRootBoneに入れる
+                    mcRootBones.Add(rootBone.transform);
+
+                }
             }
 
             // ボーンの途中でIgnoreをRootBoneに入れると軸が止まってしまうため無視
