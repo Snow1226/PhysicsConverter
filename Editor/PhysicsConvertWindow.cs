@@ -23,7 +23,8 @@ namespace Neigerium.PhysicsConverter.Editor
         private GameObject _physicsSourceAvatar;
         private GameObject _physicsTargetAvatar;
 
-        private bool _settingFoldOpen = false;
+        private bool _destroyObjectFoldOpen = true;
+        private bool _magicaClothFoldOpen = false; 
         private Vector2 _clothScrollPosition = Vector2.zero;
         private Vector2 _colliderScrollPosition = Vector2.zero;
 
@@ -32,6 +33,9 @@ namespace Neigerium.PhysicsConverter.Editor
 
         private bool _invokeChange = false;
         private bool _isPlaying = false;
+
+        [SerializeField] public List<DestroyCondition> conditions = new List<DestroyCondition>();
+        private ReorderableList _conditionList;
 
         [MenuItem("Tools/Neigerium/Physics Converter(Physbone to MagicaCloth2)")]
         public static void Init()
@@ -42,6 +46,19 @@ namespace Neigerium.PhysicsConverter.Editor
         private void OnEnable()
         {
             _invokeChange = true;
+
+            _conditionList = new ReorderableList(conditions, typeof(DestroyCondition), true, true, true, true);
+            _conditionList.drawHeaderCallback = (Rect rect) =>
+            {
+                EditorGUI.LabelField(rect, "The specified object will be deleted beforehand.");
+            };
+            _conditionList.drawElementCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
+            {
+                var condition = conditions[index];
+                condition.ConditionName = EditorGUI.TextField(new Rect(rect.x, rect.y, rect.width / 2, EditorGUIUtility.singleLineHeight), condition.ConditionName);
+                condition.NameType = (DestroyNameType)EditorGUI.EnumPopup(new Rect(rect.x + rect.width / 2 , rect.y, rect.width / 4, EditorGUIUtility.singleLineHeight), condition.NameType);
+                condition.ConditionType = (DestroyConditionType)EditorGUI.EnumPopup(new Rect(rect.x + rect.width / 4 * 3, rect.y, rect.width / 4, EditorGUIUtility.singleLineHeight), condition.ConditionType);
+            };
         }
 
         private void Update()
@@ -113,6 +130,11 @@ namespace Neigerium.PhysicsConverter.Editor
                         }
 
                         EditorGUILayout.Space();
+                        _destroyObjectFoldOpen = EditorGUILayout.Foldout(_destroyObjectFoldOpen, "DestroyObject Setting");
+                        if (_destroyObjectFoldOpen)
+                        {
+                            _conditionList.DoLayoutList();
+                        }
                     }
                     else if (_targetAvatar.GetComponent<VRCAvatarDescriptor>() == null)
                     {
@@ -121,34 +143,39 @@ namespace Neigerium.PhysicsConverter.Editor
                             SaveAvatar(_targetAvatar);
                         }
 
-                        EditorGUILayout.LabelField("MagicaClothV2 Component");
-                        using (new GUILayout.HorizontalScope())
+                        _magicaClothFoldOpen = EditorGUILayout.Foldout(_magicaClothFoldOpen, "MagicaClothV2 Component");
+                        if (_magicaClothFoldOpen)
                         {
-                            using (new GUILayout.VerticalScope())
+                            //EditorGUILayout.LabelField("MagicaClothV2 Component");
+                            using (new GUILayout.HorizontalScope())
                             {
-                                EditorGUILayout.LabelField("Cloth");
-                                _clothScrollPosition = EditorGUILayout.BeginScrollView(_clothScrollPosition);
-                                foreach (var cloth in _magicaClothList)
+                                using (new GUILayout.VerticalScope())
                                 {
-                                    EditorGUILayout.ObjectField(cloth, typeof(MagicaCloth), true);
+                                    EditorGUILayout.LabelField("Cloth");
+                                    _clothScrollPosition = EditorGUILayout.BeginScrollView(_clothScrollPosition);
+                                    foreach (var cloth in _magicaClothList)
+                                    {
+                                        EditorGUILayout.ObjectField(cloth, typeof(MagicaCloth), true);
+                                    }
+
+                                    EditorGUILayout.EndScrollView();
+
                                 }
-
-                                EditorGUILayout.EndScrollView();
-
-                            }
-                            using (new GUILayout.VerticalScope())
-                            {
-                                EditorGUILayout.LabelField("Collider");
-                                _colliderScrollPosition = EditorGUILayout.BeginScrollView(_colliderScrollPosition);
-                                foreach (var collider in _magicaColliderList)
+                                using (new GUILayout.VerticalScope())
                                 {
-                                    EditorGUILayout.ObjectField(collider, typeof(ColliderComponent), true);
+                                    EditorGUILayout.LabelField("Collider");
+                                    _colliderScrollPosition = EditorGUILayout.BeginScrollView(_colliderScrollPosition);
+                                    foreach (var collider in _magicaColliderList)
+                                    {
+                                        EditorGUILayout.ObjectField(collider, typeof(ColliderComponent), true);
+                                    }
+
+                                    EditorGUILayout.EndScrollView();
+
                                 }
-
-                                EditorGUILayout.EndScrollView();
-
                             }
                         }
+
                     }
                 }
                 else
@@ -157,13 +184,7 @@ namespace Neigerium.PhysicsConverter.Editor
                     style.wordWrap = true;
                     EditorGUILayout.LabelField("Enter Avatar object with  \"VRC Avatar Descriptor\" in \"Target Avatar\".", style);
                 }
-                /*
-                _settingFoldOpen = EditorGUILayout.Foldout(_settingFoldOpen, "Convert Setting");
-                if (_settingFoldOpen)
-                {
 
-                }
-                */
             }
         }
         private GameObject BakeModularAvatar(GameObject baseAvatar)
@@ -176,15 +197,31 @@ namespace Neigerium.PhysicsConverter.Editor
                 if (component.GetType().Name.ToLower().Contains("modularavatar"))
                 {
                     var comps = cloneAvatar.GetComponentsInChildren<Behaviour>(true);
-                    var destroyObjectList = new string[] { "VirtualLens", "LightLimitChanger" };
                     foreach (var comp in comps)
                     {
-                        if(comp != null)
+                        foreach (DestroyCondition condition in conditions)
                         {
-                            foreach (string d in destroyObjectList)
+                            if (comp != null && !string.IsNullOrEmpty(condition.ConditionName))
                             {
-                                if (comp.GetType().Name.ToLower().Contains(d.ToLower()))
-                                    GameObject.DestroyImmediate(comp.gameObject);
+                                if (condition.NameType == DestroyNameType.Component)
+                                {
+                                    if (condition.ConditionType == DestroyConditionType.Contain)
+                                        if (comp.GetType().Name.ToLower().Contains(condition.ConditionName.ToLower().Replace(" ", "")))
+                                            GameObject.DestroyImmediate(comp.gameObject);
+
+                                        else if (condition.ConditionType == DestroyConditionType.Match)
+                                            if (comp.GetType().Name.ToLower() == condition.ConditionName.ToLower().Replace(" ", ""))
+                                                GameObject.DestroyImmediate(comp.gameObject);
+                                }
+                                else if (condition.NameType == DestroyNameType.Object)
+                                {
+                                    if (condition.ConditionType == DestroyConditionType.Contain)
+                                        if (comp.gameObject.name.ToLower().Contains(condition.ConditionName.ToLower()))
+                                            GameObject.DestroyImmediate(comp.gameObject);
+                                        else if (condition.ConditionType == DestroyConditionType.Match)
+                                            if (comp.gameObject.name.ToLower() == condition.ConditionName.ToLower())
+                                                GameObject.DestroyImmediate(comp.gameObject);
+                                }
                             }
                         }
                     }
