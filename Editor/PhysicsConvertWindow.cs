@@ -191,7 +191,8 @@ namespace Neigerium.PhysicsConverter.Editor
         {
             GameObject cloneAvatar = GameObject.Instantiate(baseAvatar);
             GameObject bakedAvatar = null;
-            var  components = cloneAvatar.GetComponentsInChildren<Behaviour>(true);
+
+            var components = cloneAvatar.GetComponentsInChildren<Behaviour>(true);
             foreach (var component in components)
             {
                 if (component.GetType().Name.ToLower().Contains("modularavatar"))
@@ -285,6 +286,10 @@ namespace Neigerium.PhysicsConverter.Editor
                 var instance = GameObject.Instantiate(avatar);
                 instance.name = avatar.name;
                 instance.transform.position = avatar.transform.position;
+
+                Animator animator = instance.GetComponent<Animator>();
+                if (animator != null)
+                    animator.runtimeAnimatorController = null;
 
                 string localPath = "Assets/" + avatar.name + ".prefab";
                 PrefabUtility.SaveAsPrefabAssetAndConnect(instance, localPath, InteractionMode.UserAction);
