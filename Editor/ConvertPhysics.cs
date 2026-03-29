@@ -238,7 +238,7 @@ namespace Neigerium.PhysicsConverter.Editor
 
                 colObj.transform.localPosition = physBoneCollider.position;
                 colObj.transform.localRotation = physBoneCollider.rotation;
-
+                colObj.transform.localScale = Vector3.one;
                 // どのPhysboneColliderがMagicaClothColliderになるか対応させるためのペアを作成
                 ColliderPair pair;
                 switch (physBoneCollider.shapeType)
