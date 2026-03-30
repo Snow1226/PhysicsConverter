@@ -35,7 +35,8 @@ namespace Neigerium.PhysicsConverter.Editor
         private bool _isPlaying = false;
 
         [SerializeField] public List<DestroyCondition> conditions = new List<DestroyCondition>();
-        private ReorderableList _conditionList;
+        private GameObject _prevTarget;
+        private Vector2 _destroyListScrollPosition = Vector2.zero;
 
         [MenuItem("Tools/Neigerium/Physics Converter(Physbone to MagicaCloth2)")]
         public static void Init()
@@ -46,19 +47,6 @@ namespace Neigerium.PhysicsConverter.Editor
         private void OnEnable()
         {
             _invokeChange = true;
-
-            _conditionList = new ReorderableList(conditions, typeof(DestroyCondition), true, true, true, true);
-            _conditionList.drawHeaderCallback = (Rect rect) =>
-            {
-                EditorGUI.LabelField(rect, "The specified object will be deleted beforehand.");
-            };
-            _conditionList.drawElementCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
-            {
-                var condition = conditions[index];
-                condition.ConditionName = EditorGUI.TextField(new Rect(rect.x, rect.y, rect.width / 2, EditorGUIUtility.singleLineHeight), condition.ConditionName);
-                condition.NameType = (DestroyNameType)EditorGUI.EnumPopup(new Rect(rect.x + rect.width / 2 , rect.y, rect.width / 4, EditorGUIUtility.singleLineHeight), condition.NameType);
-                condition.ConditionType = (DestroyConditionType)EditorGUI.EnumPopup(new Rect(rect.x + rect.width / 4 * 3, rect.y, rect.width / 4, EditorGUIUtility.singleLineHeight), condition.ConditionType);
-            };
         }
 
         private void Update()
@@ -98,6 +86,30 @@ namespace Neigerium.PhysicsConverter.Editor
                             var colliderList = _targetAvatar.GetComponentsInChildren<ColliderComponent>(true);
                             _magicaColliderList.AddRange(colliderList);
                         }
+                        if (_targetAvatar != _prevTarget)
+                        {
+                            var animator = _targetAvatar.GetComponent<Animator>();
+                            if (animator != null)
+                            {
+                                var armature = animator.GetBoneTransform(HumanBodyBones.Hips).parent;
+                                if (armature != null)
+                                {
+                                    conditions.Clear();
+                                    foreach (Transform t in _targetAvatar.transform)
+                                    {
+                                        if (t != armature)
+                                        {
+                                            conditions.Add(new DestroyCondition()
+                                            {
+                                                IsDestroy = false,
+                                                ObjectName = t.gameObject.name
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            _prevTarget = _targetAvatar;
+                        }
                         _invokeChange = false;
                     }
                 }
@@ -133,7 +145,27 @@ namespace Neigerium.PhysicsConverter.Editor
                         _destroyObjectFoldOpen = EditorGUILayout.Foldout(_destroyObjectFoldOpen, "DestroyObject Setting");
                         if (_destroyObjectFoldOpen)
                         {
-                            _conditionList.DoLayoutList();
+                            using(new EditorGUILayout.VerticalScope(GUI.skin.box))
+                            {
+                                using (new EditorGUILayout.HorizontalScope())
+                                {
+                                    EditorGUILayout.LabelField("Destory", GUILayout.Width(60));
+                                    EditorGUILayout.LabelField("Object Name");
+                                }
+
+                                _destroyListScrollPosition = EditorGUILayout.BeginScrollView(_destroyListScrollPosition);
+
+                                foreach (var condition in conditions)
+                                {
+                                    using(new EditorGUILayout.HorizontalScope())
+                                    {
+                                        condition.IsDestroy = EditorGUILayout.Toggle(condition.IsDestroy, GUILayout.Width(60));
+                                        EditorGUILayout.LabelField(condition.ObjectName);
+                                    }
+                                }
+
+                                EditorGUILayout.EndScrollView();
+                            }
                         }
                     }
                     else if (_targetAvatar.GetComponent<VRCAvatarDescriptor>() == null)
@@ -191,55 +223,62 @@ namespace Neigerium.PhysicsConverter.Editor
         {
             GameObject cloneAvatar = GameObject.Instantiate(baseAvatar);
             GameObject bakedAvatar = null;
+            bool enableBake = false;
 
+            // 不要オブジェクトの削除
+            try
+            {
+                // foreach(transform in RootObject.transform)ではリストされない子オブジェクトがいる？
+                var childrens = new Transform[cloneAvatar.transform.childCount];
+                for (int i = 0; i < childrens.Length; i++)
+                    childrens[i] = cloneAvatar.transform.GetChild(i);
+
+                foreach (Transform t in childrens)
+                {
+                    if (t != null)
+                    {
+                        foreach (DestroyCondition condition in conditions)
+                        {
+                            if (condition.IsDestroy)
+                            {
+                                Debug.Log($"Clone Object : {t.gameObject.name} / DestroyCondition {condition.ObjectName}");
+                                if (t.gameObject.name == condition.ObjectName)
+                                {
+                                    GameObject.DestroyImmediate(t.gameObject);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Destroy Object exception {e}");
+            }
+
+            // ModularAvatarコンポーネントが見つかったらBake
             var components = cloneAvatar.GetComponentsInChildren<Behaviour>(true);
             foreach (var component in components)
             {
                 if (component.GetType().Name.ToLower().Contains("modularavatar"))
                 {
-                    var comps = cloneAvatar.GetComponentsInChildren<Behaviour>(true);
-                    foreach (var comp in comps)
-                    {
-                        foreach (DestroyCondition condition in conditions)
-                        {
-                            if (comp != null && !string.IsNullOrEmpty(condition.ConditionName))
-                            {
-                                if (condition.NameType == DestroyNameType.Component)
-                                {
-                                    if (condition.ConditionType == DestroyConditionType.Contain)
-                                        if (comp.GetType().Name.ToLower().Contains(condition.ConditionName.ToLower().Replace(" ", "")))
-                                            GameObject.DestroyImmediate(comp.gameObject);
-
-                                        else if (condition.ConditionType == DestroyConditionType.Match)
-                                            if (comp.GetType().Name.ToLower() == condition.ConditionName.ToLower().Replace(" ", ""))
-                                                GameObject.DestroyImmediate(comp.gameObject);
-                                }
-                                else if (condition.NameType == DestroyNameType.Object)
-                                {
-                                    if (condition.ConditionType == DestroyConditionType.Contain)
-                                        if (comp.gameObject.name.ToLower().Contains(condition.ConditionName.ToLower()))
-                                            GameObject.DestroyImmediate(comp.gameObject);
-                                        else if (condition.ConditionType == DestroyConditionType.Match)
-                                            if (comp.gameObject.name.ToLower() == condition.ConditionName.ToLower())
-                                                GameObject.DestroyImmediate(comp.gameObject);
-                                }
-                            }
-                        }
-                    }
-
                     bakedAvatar = AvatarProcessor.ManualProcessAvatar(cloneAvatar);
                     bakedAvatar.transform.transform.position = Vector3.zero;
                     bakedAvatar.name = baseAvatar.name;
                     GameObject.DestroyImmediate(cloneAvatar);
+                    enableBake = true;
                     break;
                 }
-                else
-                {
-                    bakedAvatar = cloneAvatar;
-                    bakedAvatar.transform.transform.position = Vector3.zero;
-                    bakedAvatar.name = baseAvatar.name;
-                }
             }
+            //見つからなかった場合はCloneAvatarを返す
+            if(!enableBake)
+            {
+                bakedAvatar = cloneAvatar;
+                bakedAvatar.transform.transform.position = Vector3.zero;
+                bakedAvatar.name = baseAvatar.name;
+            }
+
             return bakedAvatar;
         }
 
