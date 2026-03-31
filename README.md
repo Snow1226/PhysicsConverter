@@ -12,7 +12,7 @@ MagicaClothはPhysboneのHinge、Polarに該当する角度制限がないため
   
 ### 必要なもの
 - [MagicaCloth2](https://assetstore.unity.com/packages/tools/physics/magica-cloth-2-242307)   
-- [ModularAvatar](https://modular-avatar.nadena.dev/ja)
+- [ModularAvatar](https://modular-avatar.nadena.dev/ja)  
 プロジェクトに事前にインポートしておいてください。
 
 ### Install
