@@ -86,7 +86,6 @@ namespace Neigerium.PhysicsConverter.Editor
                 {
                     //子がいない場合はRootBoneに入れる
                     mcRootBones.Add(rootBone.transform);
-
                 }
             }
 
@@ -213,6 +212,9 @@ namespace Neigerium.PhysicsConverter.Editor
 
             // Self Collision
 
+            // RootBonesが空の場合MagicaClothをDisableにする。
+            if (mcRootBones.Count == 0)
+                magicaCloth.enabled = false;    
 
             // Build
             magicaCloth.BuildAndRun();
@@ -241,47 +243,62 @@ namespace Neigerium.PhysicsConverter.Editor
                 colObj.transform.localScale = Vector3.one;
                 // どのPhysboneColliderがMagicaClothColliderになるか対応させるためのペアを作成
                 ColliderPair pair;
-                switch (physBoneCollider.shapeType)
+
+                //Inside Colliderは現状スキップ
+                if (physBoneCollider.insideBounds)
                 {
-                    case VRC.Dynamics.VRCPhysBoneColliderBase.ShapeType.Sphere:
-                        var magicaSphereCollider = colObj.gameObject.AddComponent<MagicaSphereCollider>();
-                        magicaSphereCollider.SetSize(physBoneCollider.radius);
-
-                        pair = new ColliderPair()
-                        {
-                            referencePhysboneCollider = physBoneCollider,
-                            targetMagicaclothCollider = magicaSphereCollider
-                        };
-
-                        colliders.Add(pair);
-                        break;
-                    case VRC.Dynamics.VRCPhysBoneColliderBase.ShapeType.Capsule:
-                        var magicaCapsuleCollider = colObj.gameObject.AddComponent<MagicaCapsuleCollider>();
-                        magicaCapsuleCollider.SetSize(physBoneCollider.radius, physBoneCollider.radius, physBoneCollider.height);
-                        magicaCapsuleCollider.direction = MagicaCapsuleCollider.Direction.Y;
-
-                        pair = new ColliderPair()
-                        {
-                            referencePhysboneCollider = physBoneCollider,
-                            targetMagicaclothCollider = magicaCapsuleCollider
-                        };
-
-                        colliders.Add(pair);
-                        break;
-                    case VRC.Dynamics.VRCPhysBoneColliderBase.ShapeType.Plane:
-                        var magicaPlaneCollider = colObj.gameObject.AddComponent<MagicaPlaneCollider>();
-
-                        pair = new ColliderPair()
-                        {
-                            referencePhysboneCollider = physBoneCollider,
-                            targetMagicaclothCollider = magicaPlaneCollider
-                        };
-
-                        colliders.Add(pair);
-                        break;
-                    default:
-                        break;
+                    pair = new ColliderPair()
+                    {
+                        referencePhysboneCollider = physBoneCollider,
+                        targetMagicaclothCollider = null
+                    };
+                    colliders.Add(pair);
                 }
+                else
+                {
+                    switch (physBoneCollider.shapeType)
+                    {
+                        case VRC.Dynamics.VRCPhysBoneColliderBase.ShapeType.Sphere:
+                            var magicaSphereCollider = colObj.gameObject.AddComponent<MagicaSphereCollider>();
+                            magicaSphereCollider.SetSize(physBoneCollider.radius);
+
+                            pair = new ColliderPair()
+                            {
+                                referencePhysboneCollider = physBoneCollider,
+                                targetMagicaclothCollider = magicaSphereCollider
+                            };
+
+                            colliders.Add(pair);
+                            break;
+                        case VRC.Dynamics.VRCPhysBoneColliderBase.ShapeType.Capsule:
+                            var magicaCapsuleCollider = colObj.gameObject.AddComponent<MagicaCapsuleCollider>();
+                            magicaCapsuleCollider.SetSize(physBoneCollider.radius, physBoneCollider.radius, physBoneCollider.height);
+                            magicaCapsuleCollider.direction = MagicaCapsuleCollider.Direction.Y;
+
+                            pair = new ColliderPair()
+                            {
+                                referencePhysboneCollider = physBoneCollider,
+                                targetMagicaclothCollider = magicaCapsuleCollider
+                            };
+
+                            colliders.Add(pair);
+                            break;
+                        case VRC.Dynamics.VRCPhysBoneColliderBase.ShapeType.Plane:
+                            var magicaPlaneCollider = colObj.gameObject.AddComponent<MagicaPlaneCollider>();
+
+                            pair = new ColliderPair()
+                            {
+                                referencePhysboneCollider = physBoneCollider,
+                                targetMagicaclothCollider = magicaPlaneCollider
+                            };
+
+                            colliders.Add(pair);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+
             }
             return colliders;
         }
