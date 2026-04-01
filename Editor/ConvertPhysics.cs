@@ -113,6 +113,9 @@ namespace Neigerium.PhysicsConverter.Editor
                 }
             }
 
+            //重複削除
+            mcRootBones = mcRootBones.Distinct().ToList();
+
             // MagicaCloth2
             MagicaCloth magicaCloth = physbone.gameObject.AddComponent<MagicaCloth>();
             var sd = magicaCloth.SerializeData;
