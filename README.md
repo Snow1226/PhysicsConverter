@@ -10,6 +10,8 @@ MagicaClothはPhysboneのHinge、Polarに該当する角度制限がないため
 揺れ具合ではなく明らかに向き等がおかしい場合は、  
 使用しているアバターと衣装のBOOTH URL、どの部分がおかしいか等を添えてIssueを立てていただけると検討するかもしれません。  
   
+UnityのCloth、VRM SpringBoneは別途設定してあればそのまま出力され動作します。
+  
 ### 必要なもの
 - [MagicaCloth2](https://assetstore.unity.com/packages/tools/physics/magica-cloth-2-242307)   
 - [ModularAvatar](https://modular-avatar.nadena.dev/ja)  
@@ -38,6 +40,12 @@ TargetAvatarにConvertAvatarで変換したアバターを入れるとExport Ava
 基本的にコライダーと揺れ具合はそれっぽく転送されていますので、スカートについているMagicaClothをMeshClothに変更し、
 揺れる箇所のペイントを行うだけで貫通を防げるようになると思います。
  
+### PhysboneのInside Boundについて  
+同様の機能がないため、変換後はそのコライダーは削除されます。
+袖の回転制御等で使用しているためPlaneで囲む等の代替案を検討しましたが、  
+MagicaCloth側にIgnoreTransformに代替する機能がないため、  
+現在は削除する形で変換しています。
+
 ### ChilloutVR、Warudoでの使用について
 要求Unityバージョンが異なるため、MagicaCloth2へ変換後にそれぞれのプロジェクトにアバターデータを移す必要があります。  
 そのままでは利用できませんのでご注意ください。
