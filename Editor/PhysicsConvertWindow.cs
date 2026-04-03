@@ -149,7 +149,7 @@ namespace Neigerium.PhysicsConverter.Editor
                             {
                                 using (new EditorGUILayout.HorizontalScope())
                                 {
-                                    EditorGUILayout.LabelField("Destory", GUILayout.Width(60));
+                                    EditorGUILayout.LabelField("Destroy", GUILayout.Width(60));
                                     EditorGUILayout.LabelField("Object Name");
                                 }
 
@@ -223,7 +223,7 @@ namespace Neigerium.PhysicsConverter.Editor
         {
             GameObject cloneAvatar = GameObject.Instantiate(baseAvatar);
             GameObject bakedAvatar = null;
-            bool enableBake = false;
+            //bool enableBake = false;
 
             // 不要オブジェクトの削除
             try
@@ -257,27 +257,11 @@ namespace Neigerium.PhysicsConverter.Editor
                 Debug.LogError($"Destroy Object exception {e}");
             }
 
-            // ModularAvatarコンポーネントが見つかったらBake
-            var components = cloneAvatar.GetComponentsInChildren<Behaviour>(true);
-            foreach (var component in components)
-            {
-                if (component.GetType().Name.ToLower().Contains("modularavatar"))
-                {
-                    bakedAvatar = AvatarProcessor.ManualProcessAvatar(cloneAvatar);
-                    bakedAvatar.transform.transform.position = Vector3.zero;
-                    bakedAvatar.name = baseAvatar.name;
-                    GameObject.DestroyImmediate(cloneAvatar);
-                    enableBake = true;
-                    break;
-                }
-            }
-            //見つからなかった場合はCloneAvatarを返す
-            if(!enableBake)
-            {
-                bakedAvatar = cloneAvatar;
-                bakedAvatar.transform.transform.position = Vector3.zero;
-                bakedAvatar.name = baseAvatar.name;
-            }
+            // ManualBake
+            bakedAvatar = AvatarProcessor.ManualProcessAvatar(cloneAvatar);
+            bakedAvatar.transform.transform.position = Vector3.zero;
+            bakedAvatar.name = baseAvatar.name;
+            GameObject.DestroyImmediate(cloneAvatar);
 
             return bakedAvatar;
         }
