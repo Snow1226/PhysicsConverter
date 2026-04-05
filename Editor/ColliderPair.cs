@@ -7,7 +7,7 @@ namespace Neigerium.PhysicsConverter.Editor
     public class ColliderPair
     {
         public PhysBoneCollider referencePhysboneCollider;
-        public ColliderComponent targetMagicaclothCollider;
+        public ColliderComponent[] targetMagicaclothCollider;
     }
 
 }

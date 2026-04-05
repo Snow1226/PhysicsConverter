@@ -19,13 +19,13 @@ namespace Neigerium.PhysicsConverter.Editor
     public class ConvertPhysics
     {
         private List<ColliderPair> colliderPairs;
-
+        private List<ColliderPair> AvatarColliderPairs;
         public ConvertPhysics()
         {
             colliderPairs = new List<ColliderPair>();
         }
 
-        public void ConvertComponennts<T>(GameObject obj, List<ColliderPair> colliders = null) where T : Component
+        public void ConvertComponennts<T>(GameObject obj, List<ColliderPair> colliders = null, List<ColliderComponent> avatarColliders = null) where T : Component
         {
             var components = obj.GetComponentsInChildren<T>(true);
             foreach (var component in components)
@@ -34,7 +34,7 @@ namespace Neigerium.PhysicsConverter.Editor
                 {
                     case "VRCPhysBone":
                         var physBone = component as PhysBone;
-                        ConvertPhysbone(physBone, colliders);
+                        ConvertPhysbone(physBone, colliders, avatarColliders);
                         break;
 
                     case "VRCPhysBoneCollider":
@@ -66,7 +66,7 @@ namespace Neigerium.PhysicsConverter.Editor
             }
         }
 
-        public void ConvertPhysbone(PhysBone physbone, List<ColliderPair> colliders)
+        public void ConvertPhysbone(PhysBone physbone, List<ColliderPair> colliders, List<ColliderComponent> avatarColliders)
         {
             List<Transform> mcRootBones = new List<Transform>();
             GameObject rootBone = physbone.rootTransform != null ? physbone.rootTransform.gameObject : physbone.gameObject;
@@ -209,8 +209,16 @@ namespace Neigerium.PhysicsConverter.Editor
                 {
                     var targetCollider = colliders.Find(x => x.referencePhysboneCollider == collider).targetMagicaclothCollider;
                     if (targetCollider != null)
-                        sd.colliderCollisionConstraint.colliderList.Add(targetCollider);
+                    {
+                        foreach (var col in targetCollider)
+                            sd.colliderCollisionConstraint.colliderList.Add(col);
+                    }
                 }
+            }
+            if (physbone.allowCollision == VRC.Dynamics.VRCPhysBoneBase.AdvancedBool.True)
+            {
+                foreach (var avatarCollider in avatarColliders)
+                    sd.colliderCollisionConstraint.colliderList.Add(avatarCollider);
             }
 
             // Self Collision
@@ -221,6 +229,50 @@ namespace Neigerium.PhysicsConverter.Editor
 
             // Build
             magicaCloth.BuildAndRun();
+        }
+
+        public List<ColliderComponent> ConvertAvatarColliders(GameObject obj)
+        {
+            List <ColliderComponent> colliders = new List<ColliderComponent>();
+
+            VRCAvatarDescriptor descriptor = obj.GetComponent<VRCAvatarDescriptor>();
+            if(descriptor == null) return null;
+
+            VRCAvatarDescriptor.ColliderConfig[] colliderConfigs = new VRCAvatarDescriptor.ColliderConfig[]
+            {
+                descriptor.collider_head,
+                descriptor.collider_torso,
+                descriptor.collider_handL,
+                descriptor.collider_handR,
+                descriptor.collider_footL,
+                descriptor.collider_footR,
+                descriptor.collider_fingerIndexL,
+                descriptor.collider_fingerIndexR,
+                descriptor.collider_fingerMiddleL,
+                descriptor.collider_fingerMiddleR,
+                descriptor.collider_fingerRingL,
+                descriptor.collider_fingerRingR,
+                descriptor.collider_fingerLittleL,
+                descriptor.collider_fingerLittleR
+            };
+
+            // Fingerはなぜか第2関節に追従だけど第3関節を返す、一旦そのまま。
+            // TorsoはChestとSpineの中間位置と回転だけど計算が合うまでそのまま。
+            foreach (var config in colliderConfigs)
+            {
+                var colObj = new GameObject(config.transform.name + "_Collider");
+                colObj.transform.SetParent(config.transform);
+                colObj.transform.localPosition = config.position;
+                colObj.transform.localRotation = config.rotation;
+                colObj.transform.localScale = Vector3.one;
+
+                var magicaCollider = colObj.AddComponent<MagicaCapsuleCollider>();
+                magicaCollider.SetSize(config.radius, config.radius, config.height);
+                magicaCollider.direction = MagicaCapsuleCollider.Direction.Y;
+                colliders.Add(magicaCollider);
+            }
+
+            return colliders;
         }
 
         public List<ColliderPair> ConvertColliders<T>(GameObject obj) where T : Component
@@ -268,8 +320,7 @@ namespace Neigerium.PhysicsConverter.Editor
                             pair = new ColliderPair()
                             {
                                 referencePhysboneCollider = physBoneCollider,
-                                targetMagicaclothCollider = magicaSphereCollider
-                            };
+                                targetMagicaclothCollider = new ColliderComponent[] { magicaSphereCollider }                            };
 
                             colliders.Add(pair);
                             break;
@@ -281,7 +332,7 @@ namespace Neigerium.PhysicsConverter.Editor
                             pair = new ColliderPair()
                             {
                                 referencePhysboneCollider = physBoneCollider,
-                                targetMagicaclothCollider = magicaCapsuleCollider
+                                targetMagicaclothCollider = new ColliderComponent[] { magicaCapsuleCollider }
                             };
 
                             colliders.Add(pair);
@@ -292,7 +343,7 @@ namespace Neigerium.PhysicsConverter.Editor
                             pair = new ColliderPair()
                             {
                                 referencePhysboneCollider = physBoneCollider,
-                                targetMagicaclothCollider = magicaPlaneCollider
+                                targetMagicaclothCollider = new ColliderComponent[] { magicaPlaneCollider }
                             };
 
                             colliders.Add(pair);

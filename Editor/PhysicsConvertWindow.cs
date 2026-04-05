@@ -275,8 +275,11 @@ namespace Neigerium.PhysicsConverter.Editor
             var cloneAvatar = GameObject.Instantiate(baseAvatar);
             cloneAvatar.name = baseAvatar.name + "(Convert)";
 
+            var avatarColliders = converter.ConvertAvatarColliders(cloneAvatar);
+            if(avatarColliders == null)
+                Debug.LogWarning("No colliders found in the avatar. Please check if the avatar has colliders or if they are properly set up.");
             var colliders = converter.ConvertColliders<PhysBoneCollider>(cloneAvatar);
-            converter.ConvertComponennts<PhysBone>(cloneAvatar, colliders);
+            converter.ConvertComponennts<PhysBone>(cloneAvatar, colliders, avatarColliders);
 
             converter.ConvertComponennts<PhysBoneCollider>(cloneAvatar);
             converter.ConvertComponennts<VRCRotationConstraint>(cloneAvatar);
