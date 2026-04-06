@@ -1,3 +1,6 @@
+## v.0.2.1
+- VRC AvatarDescripterが対象を返さない場合に手コライダーが生成されない問題を修正。
+  
 ## v.0.2.0  
 - PhysboneのAllow Collisionを一旦手と指のみ対応。
 - RootBoneを再調整
@@ -5,7 +8,7 @@
 - PhysboneとInsideColliderを使用したConstraintは再現ができないためAimConstraintに置き換え
 - VRC Constraintの変換でAxis Lockが漏れていたので対応。
 - Gravityが強めの場合の変換を調整。
-- 
+  
 ## v.0.1.4
 - 変換前の不要オブジェクト削除を、名前で指定から一覧からチェックして削除に変更。
 ## v.0.1.3

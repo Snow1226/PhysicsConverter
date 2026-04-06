@@ -11,6 +11,7 @@ using UnityEngine.Animations;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDK3.Dynamics.Constraint.Components;
 using static VRC.Dynamics.PhysBoneManager;
+using static VRC.SDK3.Avatars.Components.VRCAvatarDescriptor;
 using PhysBone = VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBone;
 using PhysBoneCollider = VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBoneCollider;
 
@@ -343,6 +344,43 @@ namespace Neigerium.PhysicsConverter.Editor
             magicaCloth.BuildAndRun();
         }
 
+        private ColliderComponent SetHandCollider(ColliderConfig colliderConfig)
+        {
+            MagicaCapsuleCollider magicaCollider = null;
+            try
+            {
+                if(colliderConfig.transform == null)
+                {
+                    Debug.LogError($"Collider transform is not set.");
+                    return null;
+                }
+                var colObj = new GameObject(colliderConfig.transform.name + "_AvatarCollider");
+                colObj.transform.SetParent(colliderConfig.transform);
+                colObj.transform.localPosition = colliderConfig.position;
+
+                colObj.transform.localRotation = colliderConfig.rotation;
+                colObj.transform.localScale = Vector3.one;
+
+                magicaCollider = colObj.AddComponent<MagicaCapsuleCollider>();
+                magicaCollider.SetSize(colliderConfig.radius, colliderConfig.radius, colliderConfig.height);
+
+                // Maya製だけ手が90度回ってる。保留。
+                var vector = colliderConfig.transform.localPosition - colliderConfig.transform.parent.localPosition;
+                if(Mathf.Abs(vector.x) > Mathf.Abs(vector.y) && Mathf.Abs(vector.x) > Mathf.Abs(vector.z))
+                    magicaCollider.direction = MagicaCapsuleCollider.Direction.X;
+                else if (Mathf.Abs(vector.y) > Mathf.Abs(vector.x) && Mathf.Abs(vector.y) > Mathf.Abs(vector.z))
+                    magicaCollider.direction = MagicaCapsuleCollider.Direction.Y;
+                else
+                    magicaCollider.direction = MagicaCapsuleCollider.Direction.Z;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Failed to set hand collider : {ex.Message}");
+                return null;
+            }
+
+            return magicaCollider;
+        }
         public List<ColliderComponent> ConvertAvatarColliders(GameObject obj)
         {
             List <ColliderComponent> colliders = new List<ColliderComponent>();
@@ -350,37 +388,55 @@ namespace Neigerium.PhysicsConverter.Editor
             VRCAvatarDescriptor descriptor = obj.GetComponent<VRCAvatarDescriptor>();
             if(descriptor == null) return null;
 
-            VRCAvatarDescriptor.ColliderConfig[] colliderConfigs = new VRCAvatarDescriptor.ColliderConfig[]
-            {
-                descriptor.collider_handL,
-                descriptor.collider_handR,
-                descriptor.collider_fingerIndexL,
-                descriptor.collider_fingerIndexR,
-                descriptor.collider_fingerMiddleL,
-                descriptor.collider_fingerMiddleR,
-                descriptor.collider_fingerRingL,
-                descriptor.collider_fingerRingR,
-                descriptor.collider_fingerLittleL,
-                descriptor.collider_fingerLittleR
-            };
+            ColliderComponent[] avatarColliders = new ColliderComponent[10];
 
-            // 手以外は位置追従が特殊なため、現状は手のコライダーのみ変換する。
-            foreach (var config in colliderConfigs)
-            {
-                var colObj = new GameObject(config.transform.name + "_Collider");
-                colObj.transform.SetParent(config.transform);
-                colObj.transform.localPosition = config.position;
-                colObj.transform.localRotation = config.rotation;
-                colObj.transform.localScale = Vector3.one;
+            avatarColliders[0] = SetHandCollider(descriptor.collider_handL);
+            avatarColliders[1] = SetHandCollider(descriptor.collider_fingerIndexL);
+            avatarColliders[2] = SetHandCollider(descriptor.collider_fingerMiddleL);
+            avatarColliders[3] = SetHandCollider(descriptor.collider_fingerRingL);
+            avatarColliders[4] = SetHandCollider(descriptor.collider_fingerLittleL);
 
-                var magicaCollider = colObj.AddComponent<MagicaCapsuleCollider>();
-                magicaCollider.SetSize(config.radius, config.radius, config.height);
-                magicaCollider.direction = MagicaCapsuleCollider.Direction.Y;
-                colliders.Add(magicaCollider);
+            avatarColliders[5] = SetHandCollider(descriptor.collider_handR);
+            avatarColliders[6] = SetHandCollider(descriptor.collider_fingerIndexR);
+            avatarColliders[7] = SetHandCollider(descriptor.collider_fingerMiddleR);
+            avatarColliders[8] = SetHandCollider(descriptor.collider_fingerRingR);
+            avatarColliders[9] = SetHandCollider(descriptor.collider_fingerLittleR);
+
+            foreach (var avatarCollider in avatarColliders)
+            {
+                if (avatarCollider != null)
+                    colliders.Add(avatarCollider);
+            }
+
+            if (avatarColliders.Length == 0)
+            {
+                // 全部失敗した場合、手にスフィアだけ入れておく
+                var animator = obj.GetComponent<Animator>();
+                var leftHand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
+                var rightHand = animator.GetBoneTransform(HumanBodyBones.RightHand);
+
+                var leftCol = new GameObject("LeftHand_AvatarCollider").AddComponent<MagicaSphereCollider>();
+                leftCol.transform.SetParent(leftHand);
+                leftCol.transform.localPosition = Vector3.zero;
+                leftCol.transform.localRotation = Quaternion.identity;
+                leftCol.transform.localScale = Vector3.one; 
+                leftCol.SetSize(0.3f);
+
+                colliders.Add(leftCol); 
+
+                var rightCol = new GameObject("RightHand_AvatarCollider").AddComponent<MagicaSphereCollider>();
+                rightCol.transform.SetParent(rightHand);
+                rightCol.transform.localPosition = Vector3.zero;
+                rightCol.transform.localRotation = Quaternion.identity;
+                rightCol.transform.localScale = Vector3.one;
+                rightCol.SetSize(0.3f);
+
+                colliders.Add(rightCol);
             }
 
             return colliders;
         }
+
 
         public List<ColliderPair> ConvertColliders<T>(GameObject obj) where T : Component
         {
