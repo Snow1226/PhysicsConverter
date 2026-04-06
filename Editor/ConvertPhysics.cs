@@ -27,6 +27,20 @@ namespace Neigerium.PhysicsConverter.Editor
 
         public void ConvertComponennts<T>(GameObject obj, List<ColliderPair> colliders = null, List<ColliderComponent> avatarColliders = null) where T : Component
         {
+            // IgnoreBoneの処理のため、Armatureを取得
+            var animator = obj.GetComponent<Animator>();
+            if (animator == null)
+            {
+                Debug.LogError("Animator component is required on the root object.");
+                return;
+            }
+            var armature = animator.GetBoneTransform(HumanBodyBones.Hips).parent;
+            if (armature == null)
+            {
+                Debug.LogError("Armature not found. Make sure the avatar has a valid humanoid rig.");
+                return;
+            }
+
             var components = obj.GetComponentsInChildren<T>(true);
             foreach (var component in components)
             {
@@ -34,7 +48,7 @@ namespace Neigerium.PhysicsConverter.Editor
                 {
                     case "VRCPhysBone":
                         var physBone = component as PhysBone;
-                        ConvertPhysbone(physBone, colliders, avatarColliders);
+                        ConvertPhysbone(physBone, colliders, avatarColliders, armature);
                         break;
 
                     case "VRCPhysBoneCollider":
@@ -57,6 +71,13 @@ namespace Neigerium.PhysicsConverter.Editor
                                 weight = source.Weight
                             });
                         }
+                        Axis axis = Axis.None;
+                        if (vrcRotate.AffectsRotationX) axis |= Axis.X;
+                        if (vrcRotate.AffectsRotationY) axis |= Axis.Y;
+                        if (vrcRotate.AffectsRotationZ) axis |= Axis.Z;
+
+                        rotateConstraint.rotationAxis = axis;
+
                         var activate = typeof(RotationConstraint).GetMethod("ActivateAndPreserveOffset", BindingFlags.Instance | BindingFlags.NonPublic);
                         if (activate != null)
                             activate.Invoke(rotateConstraint, null);
@@ -66,35 +87,108 @@ namespace Neigerium.PhysicsConverter.Editor
             }
         }
 
-        public void ConvertPhysbone(PhysBone physbone, List<ColliderPair> colliders, List<ColliderComponent> avatarColliders)
+        public void ConvertPhysbone(PhysBone physbone, List<ColliderPair> colliders, List<ColliderComponent> avatarColliders, Transform armature)
         {
             List<Transform> mcRootBones = new List<Transform>();
             GameObject rootBone = physbone.rootTransform != null ? physbone.rootTransform.gameObject : physbone.gameObject;
 
-            // MagicaClothはRootBoneがBoneTaleとして回転してしまうため、RootBoneの子をRootBoneとして追加する
-            //mcRootBones.Add(rootBone.transform);
-
             var ignoreList = physbone.ignoreTransforms.ToList();
+            bool childrenHasIgnoreBone = false;
             foreach (Transform t in rootBone.transform)
             {
-                //根本でignoreTransformsで分割している場合はスキップ
-                if (ignoreList.Contains(t)) continue;
-
-                if(t.childCount > 0)
-                    mcRootBones.Add(t);
-                else
+                // ルート直下でIgnore分岐している場合はIgnore以外の子をRootBoneにいれる。
+                if (ignoreList.Contains(t))
                 {
-                    //子がいない場合はRootBoneに入れる
-                    mcRootBones.Add(rootBone.transform);
+                    childrenHasIgnoreBone = true;
+                    break;
                 }
             }
-
-            // ボーンの途中でIgnoreをRootBoneに入れると軸が止まってしまうため無視
-            /*
-            foreach (var endTransform in physbone.ignoreTransforms)
+            if (childrenHasIgnoreBone)
             {
-                if (endTransform != null)
-                    mcRootBones.Add(endTransform);
+                var boneCount = mcRootBones.Count;
+                foreach (Transform t in rootBone.transform)
+                {
+                    if (ignoreList.Contains(t)) continue;
+                    mcRootBones.Add(t);
+                }
+                if(boneCount == mcRootBones.Count)
+                {
+                    // PB Constraintは現状期待した動きをしないため、AimConstraintにて代替
+                    // ルート直下すべてがIgnoreBone且つコライダーがInsideの場合。
+                    bool hasInsideCollider = false;
+                    int insideColliderIndex = -1;
+                    for(int i = 0; i< physbone.colliders.Count;i++)
+                    {
+
+                        if (physbone.colliders[i].insideBounds == true)
+                        {
+                            insideColliderIndex = i;
+                            hasInsideCollider = true;
+                            break;
+                        }
+                    }
+                    if (hasInsideCollider && insideColliderIndex >= 0)
+                    {
+                        var aimConstraint = rootBone.AddComponent<AimConstraint>();
+                        aimConstraint.AddSource(new ConstraintSource()
+                        {
+                            sourceTransform = physbone.colliders[0].transform,
+                            weight = 1,
+                        });
+                        var activate = typeof(AimConstraint).GetMethod("ActivateAndPreserveOffset", BindingFlags.Instance | BindingFlags.NonPublic);
+                        if (activate != null)
+                            activate.Invoke(aimConstraint, null);
+                        return;
+                    }
+
+                    // ルート直下がすべてIgnoreBoneの場合はRootBoneをRootBoneにいれる。
+                    mcRootBones.Add(rootBone.transform);
+                    childrenHasIgnoreBone = false;
+                }
+
+            }
+            else
+            {
+                // ルート直下にIgnoreがない場合はRootBoneをRootBoneにいれる。
+                mcRootBones.Add(rootBone.transform);
+            }
+            // RootBonesが空の場合RootBoneを入れる。
+            if (mcRootBones.Count == 0)
+                mcRootBones.Add(rootBone.transform);
+
+
+            /*
+            // 理想は以下のコードでPBConstraintを実施したい。
+            // ルート直下以外、もしくはルート直下のすべてにIgnoreBoneがある場合はParentConstraintをつけてIgnoreBoneをRootBoneから切り離す。
+            if (!childrenHasIgnoreBone && ignoreList.count > 0)
+            {
+                // IgnoreBoneをRootBoneから切り離すためのTransformを作成
+                Transform ignoreBones;
+                ignoreBones = armature.Find("ignoreBones");
+                if (ignoreBones == null)
+                {
+                    ignoreBones = new GameObject("ignoreBones").transform;
+                    ignoreBones.SetParent(armature);
+                    ignoreBones.localPosition = Vector3.zero;
+                    ignoreBones.localRotation = Quaternion.identity;
+                }
+
+                foreach (var ignoreBone in ignoreList)
+                {
+                    if (ignoreBone != null)
+                    {
+                        var parentConstraint = ignoreBone.gameObject.AddComponent<ParentConstraint>();
+                        parentConstraint.AddSource(new ConstraintSource()
+                        {
+                            sourceTransform = ignoreBone.parent,
+                            weight = 1
+                        });
+                        var activate = typeof(ParentConstraint).GetMethod("ActivateAndPreserveOffset", BindingFlags.Instance | BindingFlags.NonPublic);
+                        if (activate != null)
+                            activate.Invoke(parentConstraint, null);
+                        ignoreBone.SetParent(ignoreBones);
+                    }
+                }
             }
             */
 
@@ -129,25 +223,33 @@ namespace Neigerium.PhysicsConverter.Editor
             // PB Momentum = Spring
 
             // Force
-            sd.gravity = physbone.gravity;
+            sd.gravity = Mathf.Clamp(physbone.gravity * (1 / physbone.pull),0,10);
             sd.gravityFalloff = physbone.gravityFalloff;
             sd.damping = new CurveSerializeData()
             {
                 curve = physbone.pullCurve,
-                value = Math.Clamp(1 - physbone.pull , 0, 1),
+                value = Math.Clamp(0.5f - physbone.pull , 0, 1),
                 useCurve = physbone.pullCurve.keys.Length == 0 ? false : true
             };
+            if(sd.gravity > 1)
+                sd.damping.value = Math.Clamp(1 - physbone.pull, 0, 1);
+
             sd.stablizationTimeAfterReset = physbone.pull;
 
             // Angle Restoration
             sd.angleRestorationConstraint.stiffness = new CurveSerializeData()
             {
                 curve = physbone.stiffnessCurve,
-                value = physbone.pull, //Math.Clamp(physbone.stiffness + physbone.spring, 0, 1),
+                value = Math.Clamp(physbone.pull + physbone.spring, 0, 1),
                 useCurve = physbone.stiffnessCurve.keys.Length == 0 ? false : true
             };
-            //if (physbone.integrationType == VRC.Dynamics.VRCPhysBoneBase.IntegrationType.Simplified)
-            //    sd.angleRestorationConstraint.stiffness.value = Math.Clamp(physbone.pull, 0, 1);
+            if (physbone.integrationType == VRC.Dynamics.VRCPhysBoneBase.IntegrationType.Simplified)
+            {
+                if(sd.gravity > 1)
+                    sd.angleRestorationConstraint.stiffness.value = Math.Clamp(physbone.pull / 10, 0, 1);
+                else
+                    sd.angleRestorationConstraint.stiffness.value = Math.Clamp(physbone.pull, 0, 1);
+            }
             //sd.angleRestorationConstraint.velocityAttenuation = physbone.pull;
             sd.angleRestorationConstraint.gravityFalloff = physbone.gravityFalloff;
 
@@ -184,6 +286,19 @@ namespace Neigerium.PhysicsConverter.Editor
             sd.triangleBendingConstraint.stiffness = 1;
             */
             // Inertia
+            /*
+            sd.inertiaConstraint = new InertiaConstraint.SerializeData();
+            if(physbone.immobileType == VRC.Dynamics.VRCPhysBoneBase.ImmobileType.AllMotion)
+            {
+                sd.inertiaConstraint.worldInertia = Mathf.Clamp(1 - physbone.immobile * 2, 0, 1);
+                sd.inertiaConstraint.localInertia = Mathf.Clamp(1 - physbone.immobile / 2, 0, 1);
+            }
+            else
+            {
+                sd.inertiaConstraint.worldInertia = 1;
+                sd.inertiaConstraint.localInertia = Mathf.Clamp(1 - physbone.immobile / 2, 0, 1);
+            }
+            */
 
             // Movement Limit
             if (sd.angleLimitConstraint.useAngleLimit && physbone.limitRotation != Vector3.zero)
@@ -215,6 +330,7 @@ namespace Neigerium.PhysicsConverter.Editor
                     }
                 }
             }
+            // PBのAllow Collision Trueの場合AvatarColliderを追加
             if (physbone.allowCollision == VRC.Dynamics.VRCPhysBoneBase.AdvancedBool.True)
             {
                 foreach (var avatarCollider in avatarColliders)
@@ -222,10 +338,6 @@ namespace Neigerium.PhysicsConverter.Editor
             }
 
             // Self Collision
-
-            // RootBonesが空の場合MagicaClothをDisableにする。
-            if (mcRootBones.Count == 0)
-                magicaCloth.enabled = false;    
 
             // Build
             magicaCloth.BuildAndRun();
@@ -240,12 +352,8 @@ namespace Neigerium.PhysicsConverter.Editor
 
             VRCAvatarDescriptor.ColliderConfig[] colliderConfigs = new VRCAvatarDescriptor.ColliderConfig[]
             {
-                descriptor.collider_head,
-                descriptor.collider_torso,
                 descriptor.collider_handL,
                 descriptor.collider_handR,
-                descriptor.collider_footL,
-                descriptor.collider_footR,
                 descriptor.collider_fingerIndexL,
                 descriptor.collider_fingerIndexR,
                 descriptor.collider_fingerMiddleL,
@@ -256,8 +364,7 @@ namespace Neigerium.PhysicsConverter.Editor
                 descriptor.collider_fingerLittleR
             };
 
-            // Fingerはなぜか第2関節に追従だけど第3関節を返す、一旦そのまま。
-            // TorsoはChestとSpineの中間位置と回転だけど計算が合うまでそのまま。
+            // 手以外は位置追従が特殊なため、現状は手のコライダーのみ変換する。
             foreach (var config in colliderConfigs)
             {
                 var colObj = new GameObject(config.transform.name + "_Collider");
@@ -296,16 +403,38 @@ namespace Neigerium.PhysicsConverter.Editor
                 colObj.transform.localPosition = physBoneCollider.position;
                 colObj.transform.localRotation = physBoneCollider.rotation;
                 colObj.transform.localScale = Vector3.one;
+
                 // どのPhysboneColliderがMagicaClothColliderになるか対応させるためのペアを作成
                 ColliderPair pair;
 
-                //Inside Colliderは現状スキップ
+                Vector3[] insidePlaneRotate = new Vector3[]
+                {
+                    new Vector3(0, 0, 0),
+                    new Vector3(0, 0, 90),
+                    new Vector3(0, 0, 180),
+                    new Vector3(0, 0, 270),
+                    new Vector3(90, 0, 0),
+                    new Vector3(270, 0, 0),
+                };
+
                 if (physBoneCollider.insideBounds)
                 {
+                    List<ColliderComponent> insideColliders = new List<ColliderComponent>();
+                    foreach (var rotate in insidePlaneRotate)
+                    {
+                        var magicaPlaneCollider = new GameObject(physBoneCollider.gameObject.name + "insidePlane").AddComponent<MagicaPlaneCollider>();
+                        magicaPlaneCollider.transform.SetParent(colObj.transform);
+                        magicaPlaneCollider.transform.localPosition = Vector3.zero;
+                        magicaPlaneCollider.transform.localRotation = Quaternion.Euler(rotate);
+                        magicaPlaneCollider.center = new Vector3(0, -physBoneCollider.radius, 0);
+
+                        insideColliders.Add(magicaPlaneCollider);
+                    }
+
                     pair = new ColliderPair()
                     {
                         referencePhysboneCollider = physBoneCollider,
-                        targetMagicaclothCollider = null
+                        targetMagicaclothCollider = insideColliders.ToArray()
                     };
                     colliders.Add(pair);
                 }
