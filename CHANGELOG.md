@@ -1,9 +1,11 @@
 ## v.0.3.0  
-- 機能追加に伴いUIを変更。
-- PhysboneをMagicaCloth2に変換のみ行うオプションを追加。
-- PhysboneのIgnoreTransformを再現するオプションを追加。
-- 非アクティブなPhysboneを変換せず削除するオプションを追加。
-- 
+- 機能追加に伴いUIを変更。  
+- PhysboneをMagicaCloth2に変換のみ行うオプションを追加。  
+- PhysboneのIgnoreTransformを再現するオプションを追加。  
+- 非アクティブなPhysboneを変換せず削除するオプションを追加。  
+- PhysboneがDisableの場合MagicaClothもDisableにするように修正。  
+- 揺れ具合の調整。  
+
 ## v.0.2.1
 - VRC AvatarDescripterが対象を返さない場合に手コライダーが生成されない問題を修正。
   

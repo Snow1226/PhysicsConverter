@@ -252,7 +252,7 @@ namespace Neigerium.PhysicsConverter.Editor
             sd.angleRestorationConstraint.stiffness = new CurveSerializeData()
             {
                 curve = physbone.stiffnessCurve,
-                value = Math.Clamp(physbone.pull + physbone.spring, 0, 1),
+                value = Math.Clamp(physbone.pull + physbone.stiffness, 0, 1),
                 useCurve = physbone.stiffnessCurve.keys.Length == 0 ? false : true
             };
             if (physbone.integrationType == VRC.Dynamics.VRCPhysBoneBase.IntegrationType.Simplified)
@@ -262,7 +262,16 @@ namespace Neigerium.PhysicsConverter.Editor
                 else
                     sd.angleRestorationConstraint.stiffness.value = Math.Clamp(physbone.pull, 0, 1);
             }
-            //sd.angleRestorationConstraint.velocityAttenuation = physbone.pull;
+            if(physbone.stiffnessCurve.keys.Length == 0)
+            {
+                AnimationCurve curve = new AnimationCurve();
+                curve.AddKey(0, 1);
+                curve.AddKey(1, physbone.stiffness);
+                sd.angleRestorationConstraint.stiffness.curve = curve;
+                sd.angleRestorationConstraint.stiffness.useCurve = true;
+            }
+
+            sd.angleRestorationConstraint.velocityAttenuation = 0.6f;
             sd.angleRestorationConstraint.gravityFalloff = physbone.gravityFalloff;
 
             // Angle Limit
@@ -313,14 +322,21 @@ namespace Neigerium.PhysicsConverter.Editor
             */
 
             // Movement Limit
-            if (sd.angleLimitConstraint.useAngleLimit && physbone.limitRotation != Vector3.zero)
+            //BackStopをするかどうか。現状判別手段がないのでRootBoneにTail。Ear等を含む場合は除外。それ以外はPhysboneのLimitRotationが0でない場合はBackStopする。
+            var exclusionList = new List<string>() { "tail", "ear" };
+            var hasExclusion = false;
+            foreach (var exclusion in exclusionList)
             {
+                if(physbone.rootTransform.gameObject.name.ToLower().Contains(exclusion))
+                {
+                    hasExclusion = true;
+                    break;
+                }
+            }
+            if (sd.angleLimitConstraint.useAngleLimit && physbone.limitRotation != Vector3.zero && !hasExclusion)
                 sd.motionConstraint.useBackstop = true;
-            }
             else
-            {
                 sd.motionConstraint.useBackstop = false;
-            }
 
             // Collider Collision
             sd.colliderCollisionConstraint.mode = ColliderCollisionConstraint.Mode.Edge;
