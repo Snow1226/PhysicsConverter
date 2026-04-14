@@ -21,6 +21,10 @@ namespace Neigerium.PhysicsConverter.Editor
     {
         private List<ColliderPair> colliderPairs;
         private List<ColliderPair> AvatarColliderPairs;
+
+        public bool ConvertIgnoreTransform {  get; set; }
+        public bool SkipConvertInactiveObject { get; set; }
+
         public ConvertPhysics()
         {
             colliderPairs = new List<ColliderPair>();
@@ -90,6 +94,10 @@ namespace Neigerium.PhysicsConverter.Editor
 
         public void ConvertPhysbone(PhysBone physbone, List<ColliderPair> colliders, List<ColliderComponent> avatarColliders, Transform armature)
         {
+            //SkipConvertInactiveObjectがtrueの場合、非アクティブなオブジェクトは変換しない
+            if (SkipConvertInactiveObject && (!physbone.gameObject.activeSelf || !physbone.gameObject.activeInHierarchy))
+                return;
+
             List<Transform> mcRootBones = new List<Transform>();
             GameObject rootBone = physbone.rootTransform != null ? physbone.rootTransform.gameObject : physbone.gameObject;
 
@@ -158,40 +166,40 @@ namespace Neigerium.PhysicsConverter.Editor
                 mcRootBones.Add(rootBone.transform);
 
 
-            /*
-            // 理想は以下のコードでPBConstraintを実施したい。
-            // ルート直下以外、もしくはルート直下のすべてにIgnoreBoneがある場合はParentConstraintをつけてIgnoreBoneをRootBoneから切り離す。
-            if (!childrenHasIgnoreBone && ignoreList.count > 0)
+            // ConvertIgnoreTransformがtrueの場合、IgnoreBoneがある場合はParentConstraintをつけてIgnoreBoneを切り離す。
+            if (ConvertIgnoreTransform)
             {
-                // IgnoreBoneをRootBoneから切り離すためのTransformを作成
-                Transform ignoreBones;
-                ignoreBones = armature.Find("ignoreBones");
-                if (ignoreBones == null)
+                if (ignoreList.Count > 0)
                 {
-                    ignoreBones = new GameObject("ignoreBones").transform;
-                    ignoreBones.SetParent(armature);
-                    ignoreBones.localPosition = Vector3.zero;
-                    ignoreBones.localRotation = Quaternion.identity;
-                }
-
-                foreach (var ignoreBone in ignoreList)
-                {
-                    if (ignoreBone != null)
+                    // IgnoreBoneをRootBoneから切り離すためのTransformを作成
+                    Transform ignoreBones;
+                    ignoreBones = armature.Find("ignoreBones");
+                    if (ignoreBones == null)
                     {
-                        var parentConstraint = ignoreBone.gameObject.AddComponent<ParentConstraint>();
-                        parentConstraint.AddSource(new ConstraintSource()
+                        ignoreBones = new GameObject("ignoreBones").transform;
+                        ignoreBones.SetParent(armature);
+                        ignoreBones.localPosition = Vector3.zero;
+                        ignoreBones.localRotation = Quaternion.identity;
+                    }
+
+                    foreach (var ignoreBone in ignoreList)
+                    {
+                        if (ignoreBone != null)
                         {
-                            sourceTransform = ignoreBone.parent,
-                            weight = 1
-                        });
-                        var activate = typeof(ParentConstraint).GetMethod("ActivateAndPreserveOffset", BindingFlags.Instance | BindingFlags.NonPublic);
-                        if (activate != null)
-                            activate.Invoke(parentConstraint, null);
-                        ignoreBone.SetParent(ignoreBones);
+                            var parentConstraint = ignoreBone.gameObject.AddComponent<ParentConstraint>();
+                            parentConstraint.AddSource(new ConstraintSource()
+                            {
+                                sourceTransform = ignoreBone.parent,
+                                weight = 1
+                            });
+                            var activate = typeof(ParentConstraint).GetMethod("ActivateAndPreserveOffset", BindingFlags.Instance | BindingFlags.NonPublic);
+                            if (activate != null)
+                                activate.Invoke(parentConstraint, null);
+                            ignoreBone.SetParent(ignoreBones);
+                        }
                     }
                 }
             }
-            */
 
             //Endpointがある場合Leaf Boneを追加
             var boneTree = rootBone.GetComponentsInChildren<Transform>(true);
@@ -213,6 +221,9 @@ namespace Neigerium.PhysicsConverter.Editor
 
             // MagicaCloth2
             MagicaCloth magicaCloth = physbone.gameObject.AddComponent<MagicaCloth>();
+
+            magicaCloth.enabled = physbone.enabled;
+
             var sd = magicaCloth.SerializeData;
             sd.clothType = ClothProcess.ClothType.BoneCloth;
             sd.rootBones = mcRootBones;

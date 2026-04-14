@@ -38,6 +38,11 @@ namespace Neigerium.PhysicsConverter.Editor
         private GameObject _prevTarget;
         private Vector2 _destroyListScrollPosition = Vector2.zero;
 
+        private bool _stateIsConvertAndExport = false;
+        private bool _convertPhysicsOnly = false;
+        private bool _notConvertInactivePB = false;
+        private bool _ignoreTransformConvert = false;
+
         [MenuItem("Tools/Neigerium/Physics Converter(Physbone to MagicaCloth2)")]
         public static void Init()
         {
@@ -118,7 +123,32 @@ namespace Neigerium.PhysicsConverter.Editor
                 {
                     if (_targetAvatar.GetComponent<VRCAvatarDescriptor>() != null)
                     {
-                        using (new GUILayout.HorizontalScope())
+                        using (new EditorGUILayout.HorizontalScope(GUI.skin.box))
+                        {
+                            if (_stateIsConvertAndExport)
+                            {
+                                GUI.backgroundColor = new Color(0.5f, 0.5f, 1f);
+                                if (GUILayout.Button("Convert & Export"))
+                                    _stateIsConvertAndExport = true;
+                                GUI.backgroundColor = Color.white;
+                                if (GUILayout.Button("Convert Physics"))
+                                    _stateIsConvertAndExport = false;
+                            }
+                            else
+                            {
+                                GUI.backgroundColor = Color.white;
+                                if (GUILayout.Button("Convert & Export"))
+                                    _stateIsConvertAndExport = true;
+                                GUI.backgroundColor = new Color(0.5f, 0.5f, 1f);
+                                if (GUILayout.Button("Convert Physics"))
+                                    _stateIsConvertAndExport = false;
+                                GUI.backgroundColor = Color.white;
+                            }
+                        }
+
+                        EditorGUILayout.Space();
+
+                        if (_stateIsConvertAndExport)
                         {
                             if (GUILayout.Button("\nConvert & Export Avatar\n"))
                             {
@@ -131,40 +161,95 @@ namespace Neigerium.PhysicsConverter.Editor
                                 DestroyImmediate(convertAvatar);
                                 DestroyImmediate(bakedAvatar);
                             }
+                        }
+                        else
+                        {
                             if (GUILayout.Button("\nConvert Avatar\n"))
                             {
-                                var bakedAvatar = BakeModularAvatar(_targetAvatar);
-                                _targetAvatar = ConvertAvatar(bakedAvatar);
+                                if (!_convertPhysicsOnly)
+                                {
+                                    var bakedAvatar = BakeModularAvatar(_targetAvatar);
+                                    _targetAvatar = ConvertAvatar(bakedAvatar);
+                                    DestroyImmediate(bakedAvatar);
+                                }
+                                else
+                                {
+                                    _targetAvatar = ConvertPhysicsOnly(_targetAvatar);
+                                }
                                 _invokeChange = true;
 
-                                DestroyImmediate(bakedAvatar);
                             }
                         }
 
+
                         EditorGUILayout.Space();
-                        _destroyObjectFoldOpen = EditorGUILayout.Foldout(_destroyObjectFoldOpen, "DestroyObject Setting");
-                        if (_destroyObjectFoldOpen)
+
+                        using (new EditorGUILayout.VerticalScope())
                         {
-                            using(new EditorGUILayout.VerticalScope(GUI.skin.box))
+                            EditorGUILayout.LabelField("Convert Setting");
+
+                            if (!_stateIsConvertAndExport)
                             {
                                 using (new EditorGUILayout.HorizontalScope())
                                 {
-                                    EditorGUILayout.LabelField("Destroy", GUILayout.Width(60));
-                                    EditorGUILayout.LabelField("Object Name");
+                                    _convertPhysicsOnly = EditorGUILayout.Toggle(_convertPhysicsOnly, GUILayout.Width(60));
+                                    EditorGUILayout.LabelField("Convert Physics Only");
                                 }
+                                EditorGUILayout.HelpBox("This does not run BakeAvatar on ModularAvatar or remove unnecessary components.\nModularAvatarのBakeAvatarの実行と、不要なコンポーネントの削除を行いません。", MessageType.Info);
+                            }
 
-                                _destroyListScrollPosition = EditorGUILayout.BeginScrollView(_destroyListScrollPosition);
+                            EditorGUILayout.Space();
 
-                                foreach (var condition in conditions)
+                            using (new EditorGUILayout.HorizontalScope())
+                            {
+                                _notConvertInactivePB = EditorGUILayout.Toggle(_notConvertInactivePB, GUILayout.Width(60));
+                                EditorGUILayout.LabelField("Not Convert Inactive Physbone");
+                            }
+                            EditorGUILayout.HelpBox("If you check this box, inactive Physbone objects will be deleted without being converted.\nチェックをいれると非アクティブなPhysboneは変換せず削除されます。", MessageType.Info);
+
+                            EditorGUILayout.Space();
+
+                            using (new EditorGUILayout.HorizontalScope())
+                            {
+                                _ignoreTransformConvert = EditorGUILayout.Toggle(_ignoreTransformConvert, GUILayout.Width(60));
+                                EditorGUILayout.LabelField("Convert IgnoreTransform");
+                            }
+                            EditorGUILayout.HelpBox("This performs the IgnoreTransform operation in Physbone.\nPhysboneのIgnoreTransformの処理を行います。", MessageType.Info);
+
+
+                            EditorGUILayout.Space();
+
+                            if((!_convertPhysicsOnly && !_stateIsConvertAndExport) || _stateIsConvertAndExport)
+                            {
+                                _destroyObjectFoldOpen = EditorGUILayout.Foldout(_destroyObjectFoldOpen, "DestroyObject Setting");
+
+                                EditorGUILayout.HelpBox("Checking the boxes for unnecessary objects that won't work after conversion, such as VRChat gimmicks, will delete them during the conversion process.\nVRC用ギミック等、変換後に動作しない不要なオブジェクトにチェックを入れると変換時に削除します。", MessageType.Info);
+
+                                if (_destroyObjectFoldOpen)
                                 {
-                                    using(new EditorGUILayout.HorizontalScope())
+                                    using (new EditorGUILayout.VerticalScope(GUI.skin.box))
                                     {
-                                        condition.IsDestroy = EditorGUILayout.Toggle(condition.IsDestroy, GUILayout.Width(60));
-                                        EditorGUILayout.LabelField(condition.ObjectName);
+                                        using (new EditorGUILayout.HorizontalScope())
+                                        {
+                                            EditorGUILayout.LabelField("Destroy", GUILayout.Width(60));
+                                            EditorGUILayout.LabelField("Object Name");
+                                        }
+
+                                        _destroyListScrollPosition = EditorGUILayout.BeginScrollView(_destroyListScrollPosition);
+
+                                        foreach (var condition in conditions)
+                                        {
+                                            using (new EditorGUILayout.HorizontalScope())
+                                            {
+                                                condition.IsDestroy = EditorGUILayout.Toggle(condition.IsDestroy, GUILayout.Width(60));
+                                                EditorGUILayout.LabelField(condition.ObjectName);
+                                            }
+                                        }
+
+                                        EditorGUILayout.EndScrollView();
                                     }
                                 }
 
-                                EditorGUILayout.EndScrollView();
                             }
                         }
                     }
@@ -271,9 +356,12 @@ namespace Neigerium.PhysicsConverter.Editor
             if (baseAvatar == null) return null;
 
             var converter = new ConvertPhysics();
+            converter.ConvertIgnoreTransform = _ignoreTransformConvert;
+            converter.SkipConvertInactiveObject = _notConvertInactivePB;
 
             var cloneAvatar = GameObject.Instantiate(baseAvatar);
             cloneAvatar.name = baseAvatar.name + "(Convert)";
+            cloneAvatar.SetActive(true);
 
             var avatarColliders = converter.ConvertAvatarColliders(cloneAvatar);
             if(avatarColliders == null)
@@ -294,10 +382,31 @@ namespace Neigerium.PhysicsConverter.Editor
                         GameObject.DestroyImmediate(comp);
                 }
             }
+            return cloneAvatar;
+        }
 
+        private GameObject ConvertPhysicsOnly(GameObject baseAvatar)
+        {
+            if (baseAvatar == null) return null;
+
+            var converter = new ConvertPhysics();
+
+            var cloneAvatar = GameObject.Instantiate(baseAvatar);
+            cloneAvatar.name = baseAvatar.name + "(Convert)";
+            cloneAvatar.SetActive(true);
+
+            var avatarColliders = converter.ConvertAvatarColliders(cloneAvatar);
+            if(avatarColliders == null)
+                Debug.LogWarning("No colliders found in the avatar. Please check if the avatar has colliders or if they are properly set up.");
+            var colliders = converter.ConvertColliders<PhysBoneCollider>(cloneAvatar);
+            converter.ConvertComponennts<PhysBone>(cloneAvatar, colliders, avatarColliders);
+
+            converter.ConvertComponennts<PhysBoneCollider>(cloneAvatar);
+            converter.ConvertComponennts<VRCRotationConstraint>(cloneAvatar);
 
             return cloneAvatar;
         }
+
         private void SaveAvatar(GameObject avatar, string path = "")
         {
             string exportpath;
