@@ -1,16 +1,12 @@
 using MagicaCloth2;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Animations;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDK3.Dynamics.Constraint.Components;
-using static VRC.Dynamics.PhysBoneManager;
 using static VRC.SDK3.Avatars.Components.VRCAvatarDescriptor;
 using PhysBone = VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBone;
 using PhysBoneCollider = VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBoneCollider;
@@ -184,18 +180,27 @@ namespace Neigerium.PhysicsConverter.Editor
 
                     foreach (var ignoreBone in ignoreList)
                     {
+                        // IgnoreBoneに空欄
                         if (ignoreBone != null)
                         {
                             var parentConstraint = ignoreBone.gameObject.AddComponent<ParentConstraint>();
-                            parentConstraint.AddSource(new ConstraintSource()
+                            // なぜかConstraintが入れられなかった場合
+                            if (parentConstraint != null)
                             {
-                                sourceTransform = ignoreBone.parent,
-                                weight = 1
-                            });
-                            var activate = typeof(ParentConstraint).GetMethod("ActivateAndPreserveOffset", BindingFlags.Instance | BindingFlags.NonPublic);
-                            if (activate != null)
-                                activate.Invoke(parentConstraint, null);
-                            ignoreBone.SetParent(ignoreBones);
+                                // なぜか親ボーンがいない場合
+                                if (ignoreBone.parent != null)
+                                {
+                                    parentConstraint.AddSource(new ConstraintSource()
+                                    {
+                                        sourceTransform = ignoreBone.parent,
+                                        weight = 1
+                                    });
+                                    var activate = typeof(ParentConstraint).GetMethod("ActivateAndPreserveOffset", BindingFlags.Instance | BindingFlags.NonPublic);
+                                    if (activate != null)
+                                        activate.Invoke(parentConstraint, null);
+                                    ignoreBone.SetParent(ignoreBones);
+                                }
+                            }
                         }
                     }
                 }
