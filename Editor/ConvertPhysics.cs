@@ -128,7 +128,7 @@ namespace Neigerium.PhysicsConverter.Editor
                     int insideColliderIndex = -1;
                     for(int i = 0; i< physbone.colliders.Count;i++)
                     {
-
+                        if(physbone.colliders[i] == null) continue;
                         if (physbone.colliders[i].insideBounds == true)
                         {
                             insideColliderIndex = i;
