@@ -28,20 +28,6 @@ namespace Neigerium.PhysicsConverter.Editor
 
         public void ConvertComponennts<T>(GameObject obj, List<ColliderPair> colliders = null, List<ColliderComponent> avatarColliders = null) where T : Component
         {
-            // IgnoreBoneの処理のため、Armatureを取得
-            var animator = obj.GetComponent<Animator>();
-            if (animator == null)
-            {
-                Debug.LogError("Animator component is required on the root object.");
-                return;
-            }
-            var armature = animator.GetBoneTransform(HumanBodyBones.Hips).parent;
-            if (armature == null)
-            {
-                Debug.LogError("Armature not found. Make sure the avatar has a valid humanoid rig.");
-                return;
-            }
-
             var components = obj.GetComponentsInChildren<T>(true);
             foreach (var component in components)
             {
@@ -49,7 +35,7 @@ namespace Neigerium.PhysicsConverter.Editor
                 {
                     case "VRCPhysBone":
                         var physBone = component as PhysBone;
-                        ConvertPhysbone(physBone, colliders, avatarColliders, armature);
+                        ConvertPhysbone(physBone, colliders, avatarColliders, obj);
                         break;
 
                     case "VRCPhysBoneCollider":
@@ -88,8 +74,50 @@ namespace Neigerium.PhysicsConverter.Editor
             }
         }
 
-        public void ConvertPhysbone(PhysBone physbone, List<ColliderPair> colliders, List<ColliderComponent> avatarColliders, Transform armature)
+        public bool HasWeight(SkinnedMeshRenderer smr, Transform bone)
         {
+            if (smr == null || bone == null) return false;
+
+            int boneIndex = -1;
+            Transform[] bones = smr.bones;
+            for (int i = 0; i < bones.Length; i++)
+            {
+                if (bones[i] == bone)
+                {
+                    boneIndex = i;
+                    break;
+                }
+            }
+
+            if (boneIndex == -1) return false;
+
+            Mesh mesh = smr.sharedMesh;
+            using (var boneWeights = mesh.GetAllBoneWeights())
+            {
+                foreach (var bw in boneWeights)
+                    if (bw.boneIndex == boneIndex && bw.weight > 0)
+                        return true;
+            }
+
+            return false;
+        }
+
+        public void ConvertPhysbone(PhysBone physbone, List<ColliderPair> colliders, List<ColliderComponent> avatarColliders, GameObject avatarObject)
+        {
+            // IgnoreBoneの処理のため、Armatureを取得
+            var animator = avatarObject.GetComponent<Animator>();
+            if (animator == null)
+            {
+                Debug.LogError("Animator component is required on the root object.");
+                return;
+            }
+            var armature = animator.GetBoneTransform(HumanBodyBones.Hips).parent;
+            if (armature == null)
+            {
+                Debug.LogError("Armature not found. Make sure the avatar has a valid humanoid rig.");
+                return;
+            }
+
             //SkipConvertInactiveObjectがtrueの場合、非アクティブなオブジェクトは変換しない
             if (SkipConvertInactiveObject && (!physbone.gameObject.activeSelf || !physbone.gameObject.activeInHierarchy))
                 return;
@@ -154,8 +182,39 @@ namespace Neigerium.PhysicsConverter.Editor
             }
             else
             {
-                // ルート直下にIgnoreがない場合はRootBoneをRootBoneにいれる。
-                mcRootBones.Add(rootBone.transform);
+                // ルート直下にIgnoreがある場合、でRootBoneのウェイトがない場合は子をRootBoneにいれる。
+                var skinnedMesh = avatarObject.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+
+                bool hasWeight = false;
+                foreach (var smr in skinnedMesh)
+                {
+                    if(smr != null)
+                    {
+                        var hasBoneWeight = HasWeight(smr, rootBone.transform);
+                        if (hasBoneWeight)
+                        {
+                            hasWeight = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (hasWeight)
+                {
+                    // ウェイトがある場合はRootBoneを入れる。
+                    mcRootBones.Add(rootBone.transform);
+                    Debug.Log($"RootBone {rootBone.name} has weight. Adding RootBone as root bone.");
+                }
+                else
+                {
+                    Debug.Log($"RootBone {rootBone.name} has no weight. Adding children as root bones.");
+
+                    // ウェイトがない場合は子をRootBoneにいれる。
+                    foreach (Transform t in rootBone.transform)
+                    {
+                        mcRootBones.Add(t);
+                    }
+                }
             }
             // RootBonesが空の場合RootBoneを入れる。
             if (mcRootBones.Count == 0)
@@ -330,12 +389,15 @@ namespace Neigerium.PhysicsConverter.Editor
             //BackStopをするかどうか。現状判別手段がないのでRootBoneにTail。Ear等を含む場合は除外。それ以外はPhysboneのLimitRotationが0でない場合はBackStopする。
             var exclusionList = new List<string>() { "tail", "ear" };
             var hasExclusion = false;
-            foreach (var exclusion in exclusionList)
+            if(rootBone != null)
             {
-                if(physbone.rootTransform.gameObject.name.ToLower().Contains(exclusion))
+                foreach (var exclusion in exclusionList)
                 {
-                    hasExclusion = true;
-                    break;
+                    if (rootBone.gameObject.name.ToLower().Contains(exclusion))
+                    {
+                        hasExclusion = true;
+                        break;
+                    }
                 }
             }
             if (sd.angleLimitConstraint.useAngleLimit && physbone.limitRotation != Vector3.zero && !hasExclusion)

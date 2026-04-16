@@ -91,7 +91,7 @@ namespace Neigerium.PhysicsConverter.Editor
                             var colliderList = _targetAvatar.GetComponentsInChildren<ColliderComponent>(true);
                             _magicaColliderList.AddRange(colliderList);
                         }
-                        if (_targetAvatar != _prevTarget)
+                        if (_targetAvatar != null && _targetAvatar != _prevTarget)
                         {
                             var animator = _targetAvatar.GetComponent<Animator>();
                             if (animator != null)
