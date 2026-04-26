@@ -24,7 +24,8 @@ namespace Neigerium.PhysicsConverter.Editor
         private GameObject _physicsTargetAvatar;
 
         private bool _destroyObjectFoldOpen = true;
-        private bool _magicaClothFoldOpen = false; 
+        private bool _magicaClothFoldOpen = true;
+        private bool _magicaClothColliderFoldOpen = false;
         private Vector2 _clothScrollPosition = Vector2.zero;
         private Vector2 _colliderScrollPosition = Vector2.zero;
 
@@ -237,13 +238,21 @@ namespace Neigerium.PhysicsConverter.Editor
 
                                         _destroyListScrollPosition = EditorGUILayout.BeginScrollView(_destroyListScrollPosition);
 
+                                        bool odd = false;
                                         foreach (var condition in conditions)
                                         {
-                                            using (new EditorGUILayout.HorizontalScope())
+                                            if(odd)
+                                                GUI.backgroundColor = new Color(0.4f, 0.4f, 0.6f);
+                                            else
+                                                GUI.backgroundColor = Color.white;
+                                            using (new EditorGUILayout.HorizontalScope(GUI.skin.box))
                                             {
+                                                GUI.backgroundColor = Color.white;
                                                 condition.IsDestroy = EditorGUILayout.Toggle(condition.IsDestroy, GUILayout.Width(60));
                                                 EditorGUILayout.LabelField(condition.ObjectName);
                                             }
+                                            GUI.backgroundColor = Color.white;
+                                            odd = !odd;
                                         }
 
                                         EditorGUILayout.EndScrollView();
@@ -272,12 +281,37 @@ namespace Neigerium.PhysicsConverter.Editor
                                     _clothScrollPosition = EditorGUILayout.BeginScrollView(_clothScrollPosition);
                                     foreach (var cloth in _magicaClothList)
                                     {
-                                        EditorGUILayout.ObjectField(cloth, typeof(MagicaCloth), true);
+                                        using(new EditorGUILayout.HorizontalScope(GUI.skin.box))
+                                        {
+                                            EditorGUILayout.ObjectField(cloth, typeof(MagicaCloth), true);
+                                            if (GUILayout.Button("Select", GUILayout.Width(120)))
+                                            {
+                                                Selection.activeGameObject = cloth.gameObject;
+                                            }
+                                            if (GUILayout.Button("Fix Shake", GUILayout.Width(120)))
+                                            {
+                                                var roots = cloth.SerializeData.rootBones;
+                                                List<Transform> newRoots = new List<Transform>();
+                                                foreach (var root in roots)
+                                                    if (root != null)
+                                                        foreach (Transform t in root.transform)
+                                                            if (t != null)
+                                                                newRoots.Add(t);
+                                                cloth.SerializeData.rootBones = newRoots;
+
+                                            }
+                                        }
                                     }
 
                                     EditorGUILayout.EndScrollView();
-
                                 }
+                            }
+                        }
+                        _magicaClothColliderFoldOpen = EditorGUILayout.Foldout(_magicaClothColliderFoldOpen, "MagicaClothV2 Collider Component");
+                        if (_magicaClothColliderFoldOpen)
+                        {
+                            using (new GUILayout.HorizontalScope())
+                            {
                                 using (new GUILayout.VerticalScope())
                                 {
                                     EditorGUILayout.LabelField("Collider");
@@ -292,7 +326,6 @@ namespace Neigerium.PhysicsConverter.Editor
                                 }
                             }
                         }
-
                     }
                 }
                 else

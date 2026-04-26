@@ -15,15 +15,13 @@ namespace Neigerium.PhysicsConverter.Editor
 {
     public class ConvertPhysics
     {
-        private List<ColliderPair> colliderPairs;
-        private List<ColliderPair> AvatarColliderPairs;
-
+        private List<Transform> _ignoreBones;
         public bool ConvertIgnoreTransform {  get; set; }
         public bool SkipConvertInactiveObject { get; set; }
 
         public ConvertPhysics()
         {
-            colliderPairs = new List<ColliderPair>();
+            _ignoreBones = new List<Transform>();
         }
 
         public void ConvertComponennts<T>(GameObject obj, List<ColliderPair> colliders = null, List<ColliderComponent> avatarColliders = null) where T : Component
@@ -39,6 +37,25 @@ namespace Neigerium.PhysicsConverter.Editor
                         break;
 
                     case "VRCPhysBoneCollider":
+                        // IgnoreBoneをRootBoneから切り離すためのTransformを作成
+                        Transform ignoreBones;
+                        var armature = obj.GetComponent<Animator>().GetBoneTransform(HumanBodyBones.Hips).parent;
+                        ignoreBones = armature.Find("ignoreBones");
+                        if (ignoreBones == null)
+                        {
+                            ignoreBones = new GameObject("ignoreBones").transform;
+                            ignoreBones.SetParent(armature);
+                            ignoreBones.localPosition = Vector3.zero;
+                            ignoreBones.localRotation = Quaternion.identity;
+                        }
+
+                        if (_ignoreBones != null && _ignoreBones.Count > 0)
+                        {
+                            foreach(Transform t in _ignoreBones)
+                            {
+                                t.SetParent(ignoreBones);
+                            }
+                        }
                         break;
 
                     case "VRCRotationConstraint":
@@ -182,7 +199,7 @@ namespace Neigerium.PhysicsConverter.Editor
             }
             else
             {
-                // ルート直下にIgnoreがある場合、でRootBoneのウェイトがない場合は子をRootBoneにいれる。
+                // ルート直下にIgnoreがある場合でRootBoneのウェイトがない場合は子をRootBoneにいれる。
                 var skinnedMesh = avatarObject.GetComponentsInChildren<SkinnedMeshRenderer>(true);
 
                 bool hasWeight = false;
@@ -212,7 +229,11 @@ namespace Neigerium.PhysicsConverter.Editor
                     // ウェイトがない場合は子をRootBoneにいれる。
                     foreach (Transform t in rootBone.transform)
                     {
-                        mcRootBones.Add(t);
+                        //子がEndBoneの場合は親をいれる。
+                        if (t.childCount == 0)
+                            mcRootBones.Add(rootBone.transform);
+                        else
+                            mcRootBones.Add(t);
                     }
                 }
             }
@@ -226,6 +247,7 @@ namespace Neigerium.PhysicsConverter.Editor
             {
                 if (ignoreList.Count > 0)
                 {
+                    /*
                     // IgnoreBoneをRootBoneから切り離すためのTransformを作成
                     Transform ignoreBones;
                     ignoreBones = armature.Find("ignoreBones");
@@ -236,6 +258,7 @@ namespace Neigerium.PhysicsConverter.Editor
                         ignoreBones.localPosition = Vector3.zero;
                         ignoreBones.localRotation = Quaternion.identity;
                     }
+                    */
 
                     foreach (var ignoreBone in ignoreList)
                     {
@@ -257,7 +280,11 @@ namespace Neigerium.PhysicsConverter.Editor
                                     var activate = typeof(ParentConstraint).GetMethod("ActivateAndPreserveOffset", BindingFlags.Instance | BindingFlags.NonPublic);
                                     if (activate != null)
                                         activate.Invoke(parentConstraint, null);
-                                    ignoreBone.SetParent(ignoreBones);
+                                    if(_ignoreBones == null)
+                                        _ignoreBones = new List<Transform>();
+                                    _ignoreBones.Add(ignoreBone);
+                                    //先に移動するとほかの揺れもの設定の際に行方不明になるため、最後に移動する。
+                                    //ignoreBone.SetParent(ignoreBones);
                                 }
                             }
                         }
@@ -291,6 +318,11 @@ namespace Neigerium.PhysicsConverter.Editor
             var sd = magicaCloth.SerializeData;
             sd.clothType = ClothProcess.ClothType.BoneCloth;
             sd.rootBones = mcRootBones;
+
+            if (mcRootBones.Count >= 4)
+                sd.connectionMode = RenderSetupData.BoneConnectionMode.AutomaticMesh;
+            else
+                sd.connectionMode = RenderSetupData.BoneConnectionMode.Line;
 
             sd.normalAlignmentSetting.alignmentMode = NormalAlignmentSettings.AlignmentMode.Transform;
             sd.normalAlignmentSetting.adjustmentTransform = magicaCloth.gameObject.transform;
