@@ -1,9 +1,10 @@
 {
     "name": "neigerium.physicsconverter",
-    "rootNamespace": "Neigerium",
+    "rootNamespace": "",
     "references": [
         "GUID:406190ab8ee569c46bc05a890e5127a0",
-        "GUID:62ced99b048af7f4d8dfe4bed8373d76"
+        "GUID:62ced99b048af7f4d8dfe4bed8373d76",
+        "GUID:a462ac87cc773634185d5fe96185b8b8"
     ],
     "includePlatforms": [
         "Editor"

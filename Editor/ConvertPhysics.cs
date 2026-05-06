@@ -86,6 +86,109 @@ namespace Neigerium.PhysicsConverter.Editor
                         if (activate != null)
                             activate.Invoke(rotateConstraint, null);
                         break;
+                    case "VRCParentConstraint":
+                        var vrcParent = component as VRCParentConstraint;
+                        ParentConstraint parentConstraint;
+                        if (vrcParent.TargetTransform != null)
+                            parentConstraint = vrcParent.TargetTransform.gameObject.AddComponent<ParentConstraint>();
+                        else
+                            parentConstraint = component.gameObject.AddComponent<ParentConstraint>();
+                        parentConstraint.weight = vrcParent.GlobalWeight;
+                        foreach (var source in vrcParent.Sources)
+                        {
+                            parentConstraint.AddSource(new ConstraintSource()
+                            {
+                                sourceTransform = source.SourceTransform,
+                                weight = source.Weight
+                            });
+                        }
+                        var activate2 = typeof(ParentConstraint).GetMethod("ActivateAndPreserveOffset", BindingFlags.Instance | BindingFlags.NonPublic);
+                        if (activate2 != null)
+                            activate2.Invoke(parentConstraint, null);
+                        break;
+                    case "VRCAimConstraint":
+                        var vrcAim = component as VRCAimConstraint;
+                        AimConstraint aimConstraint;
+                        if (vrcAim.TargetTransform != null)
+                            aimConstraint = vrcAim.TargetTransform.gameObject.AddComponent<AimConstraint>();
+                        else
+                            aimConstraint = component.gameObject.AddComponent<AimConstraint>();
+                        aimConstraint.weight = vrcAim.GlobalWeight;
+                        foreach (var source in vrcAim.Sources)
+                        {
+                            aimConstraint.AddSource(new ConstraintSource()
+                            {
+                                sourceTransform = source.SourceTransform,
+                                weight = source.Weight
+                            });
+                        }
+                        Axis aimAxis = Axis.None;
+                        if (vrcAim.AffectsRotationX) aimAxis |= Axis.X;
+                        if (vrcAim.AffectsRotationY) aimAxis |= Axis.Y;
+                        if (vrcAim.AffectsRotationZ) aimAxis |= Axis.Z;
+                        aimConstraint.rotationAxis = aimAxis;
+                        var activate3 = typeof(AimConstraint).GetMethod("ActivateAndPreserveOffset", BindingFlags.Instance | BindingFlags.NonPublic);
+                        if (activate3 != null)
+                            activate3.Invoke(aimConstraint, null);
+                        break;
+                    case "VRCPositionConstraint":
+                        var vrcPosition = component as VRCPositionConstraint;
+                        PositionConstraint positionConstraint;
+                        if (vrcPosition.TargetTransform != null)
+                            positionConstraint = vrcPosition.TargetTransform.gameObject.AddComponent<PositionConstraint>();
+                        else
+                            positionConstraint = component.gameObject.AddComponent<PositionConstraint>();
+                        positionConstraint.weight = vrcPosition.GlobalWeight;
+                        foreach (var source in vrcPosition.Sources)
+                        {
+                            positionConstraint.AddSource(new ConstraintSource()
+                            {
+                                sourceTransform = source.SourceTransform,
+                                weight = source.Weight
+                            });
+                        }
+                        Axis positionAxis = Axis.None;
+                        if (vrcPosition.AffectsPositionX) positionAxis |= Axis.X;
+                        if (vrcPosition.AffectsPositionY) positionAxis |= Axis.Y;
+                        if (vrcPosition.AffectsPositionZ) positionAxis |= Axis.Z;
+                        positionConstraint.translationAxis = positionAxis;
+                        var activate4 = typeof(PositionConstraint).GetMethod("ActivateAndPreserveOffset", BindingFlags.Instance | BindingFlags.NonPublic);
+                        if (activate4 != null)
+                            activate4.Invoke(positionConstraint, null);
+                        break;
+                    case "VRCScaleConstraint":
+                        var vrcScale = component as VRCScaleConstraint;
+                        if (float.IsNaN(vrcScale.Sources[0].Weight))
+                        {
+                            if (vrcScale.TargetTransform != null)
+                                vrcScale.TargetTransform.gameObject.AddComponent<ShapeChangerDelete>();
+                            else
+                                component.gameObject.AddComponent<ShapeChangerDelete>();
+                            break;
+                        }
+                        ScaleConstraint scaleConstraint;
+                        if (vrcScale.TargetTransform != null)
+                            scaleConstraint = vrcScale.TargetTransform.gameObject.AddComponent<ScaleConstraint>();
+                        else
+                            scaleConstraint = component.gameObject.AddComponent<ScaleConstraint>();
+                        scaleConstraint.weight = vrcScale.GlobalWeight;
+                        foreach (var source in vrcScale.Sources)
+                        {
+                            scaleConstraint.AddSource(new ConstraintSource()
+                            {
+                                sourceTransform = source.SourceTransform,
+                                weight = source.Weight
+                            });
+                        }
+                        Axis scaleAxis = Axis.None;
+                        if (vrcScale.AffectsScaleX) scaleAxis |= Axis.X;
+                        if (vrcScale.AffectsScaleY) scaleAxis |= Axis.Y;
+                        if (vrcScale.AffectsScaleZ) scaleAxis |= Axis.Z;
+                        scaleConstraint.scalingAxis = scaleAxis;
+                        var activate5 = typeof(ScaleConstraint).GetMethod("ActivateAndPreserveOffset", BindingFlags.Instance | BindingFlags.NonPublic);
+                        if (activate5 != null)
+                            activate5.Invoke(scaleConstraint, null);
+                        break;
                 }
                 GameObject.DestroyImmediate(component);
             }
@@ -319,10 +422,13 @@ namespace Neigerium.PhysicsConverter.Editor
             sd.clothType = ClothProcess.ClothType.BoneCloth;
             sd.rootBones = mcRootBones;
 
+            sd.connectionMode = RenderSetupData.BoneConnectionMode.Line;
+            /*
             if (mcRootBones.Count >= 4)
                 sd.connectionMode = RenderSetupData.BoneConnectionMode.AutomaticMesh;
             else
                 sd.connectionMode = RenderSetupData.BoneConnectionMode.Line;
+            */
 
             sd.normalAlignmentSetting.alignmentMode = NormalAlignmentSettings.AlignmentMode.Transform;
             sd.normalAlignmentSetting.adjustmentTransform = magicaCloth.gameObject.transform;

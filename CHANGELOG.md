@@ -1,3 +1,7 @@
+## v.0.4.0
+- MA ShapeChangerのDeleteを再現。
+- 実験用に入れていたMagicaClothのBoneCloth、AutomaticMeshが入っていたので削除。（揺れ具合が変わるため）
+  
 ## v.0.3.4
 - IgnoreBoneの移動タイミングを変更。
 - 変換後に暴れるボーンを修正するボタンの追加。

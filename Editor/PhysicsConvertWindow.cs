@@ -26,6 +26,7 @@ namespace Neigerium.PhysicsConverter.Editor
         private bool _destroyObjectFoldOpen = true;
         private bool _magicaClothFoldOpen = true;
         private bool _magicaClothColliderFoldOpen = false;
+        private Vector2 _convertWindowScrollPosition = Vector2.zero;
         private Vector2 _clothScrollPosition = Vector2.zero;
         private Vector2 _colliderScrollPosition = Vector2.zero;
 
@@ -69,6 +70,7 @@ namespace Neigerium.PhysicsConverter.Editor
         {
             using(new GUILayout.VerticalScope())
             {
+                _convertWindowScrollPosition = EditorGUILayout.BeginScrollView(_convertWindowScrollPosition);
                 //////////////////////////////////////////////////////////////////////////////////////////
                 // for VMC
                 GUILayout.Label("Avatar Convert ( for VirtualMotionCapture Mod )", EditorStyles.boldLabel);
@@ -228,7 +230,7 @@ namespace Neigerium.PhysicsConverter.Editor
 
                                 if (_destroyObjectFoldOpen)
                                 {
-                                    using (new EditorGUILayout.VerticalScope(GUI.skin.box))
+                                    using (new EditorGUILayout.VerticalScope(GUI.skin.box, GUILayout.Height(300)))
                                     {
                                         using (new EditorGUILayout.HorizontalScope())
                                         {
@@ -275,7 +277,7 @@ namespace Neigerium.PhysicsConverter.Editor
                             //EditorGUILayout.LabelField("MagicaClothV2 Component");
                             using (new GUILayout.HorizontalScope())
                             {
-                                using (new GUILayout.VerticalScope())
+                                using (new GUILayout.VerticalScope(GUILayout.Height(300)))
                                 {
                                     EditorGUILayout.LabelField("Cloth");
                                     _clothScrollPosition = EditorGUILayout.BeginScrollView(_clothScrollPosition);
@@ -312,7 +314,7 @@ namespace Neigerium.PhysicsConverter.Editor
                         {
                             using (new GUILayout.HorizontalScope())
                             {
-                                using (new GUILayout.VerticalScope())
+                                using (new GUILayout.VerticalScope(GUILayout.Height(300)))
                                 {
                                     EditorGUILayout.LabelField("Collider");
                                     _colliderScrollPosition = EditorGUILayout.BeginScrollView(_colliderScrollPosition);
@@ -334,6 +336,7 @@ namespace Neigerium.PhysicsConverter.Editor
                     style.wordWrap = true;
                     EditorGUILayout.LabelField("Enter Avatar object with  \"VRC Avatar Descriptor\" in \"Target Avatar\".", style);
                 }
+                GUILayout.EndScrollView();
 
             }
         }
@@ -376,13 +379,14 @@ namespace Neigerium.PhysicsConverter.Editor
             }
 
             // ManualBake
-            bakedAvatar = AvatarProcessor.ManualProcessAvatar(cloneAvatar);
+            bakedAvatar = AvatarProcessor.ManualProcessAvatar(cloneAvatar,nadena.dev.ndmf.platform.AmbientPlatform.DefaultPlatform);
             bakedAvatar.transform.transform.position = Vector3.zero;
             bakedAvatar.name = baseAvatar.name;
             GameObject.DestroyImmediate(cloneAvatar);
 
             return bakedAvatar;
         }
+
 
         private GameObject ConvertAvatar(GameObject baseAvatar)
         {
@@ -404,6 +408,9 @@ namespace Neigerium.PhysicsConverter.Editor
 
             converter.ConvertComponennts<PhysBoneCollider>(cloneAvatar);
             converter.ConvertComponennts<VRCRotationConstraint>(cloneAvatar);
+            converter.ConvertComponennts<VRCPositionConstraint>(cloneAvatar);
+            converter.ConvertComponennts<VRCParentConstraint>(cloneAvatar);
+            converter.ConvertComponennts<VRCScaleConstraint>(cloneAvatar);
 
             var comps = cloneAvatar.GetComponentsInChildren<Behaviour>(true);
             var destroyList = new string[] { "PortableDynamicBone", "VRC", "NDMF", "Pipeline" };
